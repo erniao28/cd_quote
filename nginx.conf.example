@@ -1,0 +1,31 @@
+# Nginx 配置示例 - 部署到服务器
+
+# 假设你的服务器域名或 IP 是：192.168.1.100
+
+# 一级报价系统 (现有)
+location /cd-pricing {
+    proxy_pass http://localhost:5173;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+}
+
+# 爬虫系统 (新项目)
+location /cd-quote {
+    proxy_pass http://localhost:5174;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+}
+
+# 一级报价后端 API
+location /cd-pricing-api {
+    proxy_pass http://localhost:3000;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+}
+
+# 爬虫系统后端 API
+location /cd-quote-api {
+    proxy_pass http://localhost:3001;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+}
