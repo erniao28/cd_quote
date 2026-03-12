@@ -1,9 +1,13 @@
-# 货币网爬虫系统 (CD.Quote)
+# auto-quote 货币网爬虫系统
+
+基于 Nginx 路径前缀隔离方案，与一级报价系统共用同一服务器和端口。
+
+---
 
 ## 项目结构
 
 ```
-cd_quote/
+auto-quote/
 ├── backend/               # 后端服务
 │   ├── src/
 │   │   ├── index.js       # 入口文件
@@ -12,7 +16,6 @@ cd_quote/
 │   │   └── routes/        # API 接口
 │   ├── data/              # 数据库文件
 │   ├── .env               # 本地环境配置
-│   ├── .env.production    # 生产环境配置
 │   └── package.json
 │
 ├── frontend/              # 前端服务
@@ -23,7 +26,7 @@ cd_quote/
 │   │   └── App.tsx        # 主应用
 │   └── package.json
 │
-├── nginx.conf.example     # Nginx 配置示例
+├── nginx-auto-quote.conf  # Nginx 配置
 ├── ecosystem.config.js    # PM2 部署配置
 └── README.md
 ```
@@ -35,7 +38,7 @@ cd_quote/
 ### 安装依赖
 
 ```bash
-cd E:\file\project_ai\cc_test\cd_quote
+cd auto-quote
 
 # 安装后端依赖
 cd backend
@@ -67,108 +70,69 @@ npm run dev
 
 ## 服务器部署
 
-### 1. 构建前端
+### 一键部署脚本
 
 ```bash
+# 上传代码到服务器后运行
+chmod +x deploy-server.sh
+./deploy-server.sh
+```
+
+### 手动部署
+
+```bash
+# 1. 构建前端
 cd frontend
+npm install --production
 npm run build
-# 生成 dist/ 目录
-```
 
-### 2. 使用 PM2 启动后端
-
-```bash
-# 安装 PM2
-npm install -g pm2
-
-# 启动后端服务
-pm2 start ecosystem.config.js
-
-# 查看状态
-pm2 status
-
-# 保存 PM2 配置（开机自启）
+# 2. 启动后端
+cd ..
+pm2 start ecosystem.config.js --name auto-quote-backend
 pm2 save
-pm2 startup
-```
 
-### 3. 使用 PM2 启动前端（生产模式）
+# 3. 配置 Nginx（创建独立配置文件）
+sudo cp nginx-auto-quote.conf /etc/nginx/sites-available/auto-quote
+sudo ln -s /etc/nginx/sites-available/auto-quote /etc/nginx/sites-enabled/
 
-```bash
-# 安装 serve
-npm install -g serve
-
-# 启动前端（端口 5174）
-serve -s frontend/dist -l 5174
-```
-
-### 4. Nginx 配置
-
-将 `nginx.conf.example` 中的配置复制到你的 Nginx 配置中：
-
-```bash
-# 编辑 Nginx 配置
-sudo vim /etc/nginx/sites-available/default
-
-# 重启 Nginx
-sudo systemctl restart nginx
+# 4. 测试并重载 Nginx
+sudo nginx -t && sudo systemctl reload nginx
 ```
 
 ---
 
-## 部署到同一服务器（与一级报价整合）
+## 访问地址
 
-### 端口分配
-
-| 项目 | 前端端口 | 后端端口 |
-|------|----------|----------|
-| 一级报价 | 5173 | 3000 |
-| 爬虫系统 | 5174 | 3001 |
-
-### Nginx 配置
-
-```nginx
-# 一级报价
-location /cd-pricing {
-    proxy_pass http://localhost:5173;
-}
-
-# 爬虫系统
-location /cd-quote {
-    proxy_pass http://localhost:5174;
-}
-
-# 一级报价 API
-location /cd-pricing-api {
-    proxy_pass http://localhost:3000;
-}
-
-# 爬虫系统 API
-location /cd-quote-api {
-    proxy_pass http://localhost:3001;
-}
-```
-
-### 访问地址
-
-- 一级报价：`http://你的服务器 IP/cd-pricing`
-- 爬虫系统：`http://你的服务器 IP/cd-quote`
+| 项目 | 访问路径 |
+|------|----------|
+| 一级报价 | `http://服务器 IP/` |
+| auto-quote | `http://服务器 IP/auto-quote/` |
 
 ---
 
-## 环境变量说明
+## 端口分配
+
+| 项目 | 前端端口 | 后端端口 | Nginx 路径 |
+|------|----------|----------|-----------|
+| 一级报价 (NCD) | 5173 | 3000 | `/` 和 `/api` |
+| auto-quote | 5174 | 3002 | `/auto-quote/` 和 `/auto-quote-api/` |
+
+---
+
+## 环境变量
 
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
 | PORT | 后端端口 | 3001 |
+| HOST | 绑定地址 | 127.0.0.1 |
 | DB_PATH | 数据库路径 | ./data/cd_quote.db |
-| CORS_ORIGIN | CORS 白名单 | * (生产环境) |
+| CORS_ORIGIN | CORS 白名单 | http://localhost:5173 |
 
 ---
 
 ## 注意事项
 
-1. 服务器部署需要开放相应端口（3001, 5174）
-2. 建议使用 PM2 管理 Node.js 进程
-3. 数据库文件会保存在 `backend/data/` 目录
-4. 定期备份数据库文件
+1. 后端仅监听 `127.0.0.1`，外部无法直接访问
+2. 必须通过 Nginx 代理访问
+3. 防火墙只需开放 80/443/22 端口
+4. 使用 PM2 管理进程，`pm2 logs auto-quote-backend` 查看日志

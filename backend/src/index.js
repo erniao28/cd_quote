@@ -11,9 +11,10 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const HOST = process.env.HOST || '127.0.0.1';
 
-// 配置 CORS
-const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
+// 配置 CORS - 支持本地开发和生产环境（Nginx 代理）
+const corsOrigin = process.env.CORS_ORIGIN || '*';
 app.use(cors({
   origin: corsOrigin,
   credentials: true
@@ -41,13 +42,13 @@ async function startServer() {
     startCrawlScheduler();
 
     // 启动服务器
-    app.listen(PORT, () => {
+    app.listen(PORT, HOST, () => {
       console.log(`
 ╔═══════════════════════════════════════════════════╗
 ║     货币网爬虫系统后端服务启动成功                 ║
 ╠═══════════════════════════════════════════════════╣
-║  HTTP API:    http://localhost:${PORT}              ║
-║  健康检查：http://localhost:${PORT}/health          ║
+║  HTTP API:    http://${HOST}:${PORT}              ║
+║  健康检查：http://${HOST}:${PORT}/health          ║
 ╚═══════════════════════════════════════════════════╝
       `);
     });

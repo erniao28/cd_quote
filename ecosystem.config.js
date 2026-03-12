@@ -4,7 +4,7 @@
 module.exports = {
   apps: [
     {
-      name: 'cd-quote-backend',
+      name: 'auto-quote-backend',
       script: './backend/src/index.js',
       cwd: './',
       instances: 1,
@@ -13,10 +13,10 @@ module.exports = {
       max_memory_restart: '500M',
       env: {
         NODE_ENV: 'production',
-        PORT: 3001
+        PORT: 3002
       },
-      error_file: './logs/cd-quote-error.log',
-      out_file: './logs/cd-quote-out.log'
+      error_file: './logs/auto-quote-error.log',
+      out_file: './logs/auto-quote-out.log'
     }
   ]
 };

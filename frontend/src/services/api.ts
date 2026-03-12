@@ -1,11 +1,10 @@
 // 后端 API 服务 - 生产环境配置
 
-// 自动获取当前页面域名，适配本地和服务器部署
-const API_HOST = window.location.hostname;
-const API_PORT = 3001;  // 后端端口固定
-
-// 本地开发用 HTTP，生产环境自动用 HTTPS
-const API_BASE = `${window.location.protocol}//${API_HOST}:${API_PORT}/api`;
+// 本地开发用 localhost:3002，生产环境通过 Nginx /auto-quote-api 路径访问
+const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const API_BASE = isDev
+  ? `http://localhost:3002/api`
+  : `/auto-quote-api`;
 
 // ========== 价格数据 API ==========
 
