@@ -51,6 +51,15 @@ export async function uploadExcel(excelData: string) {
   return res.json();
 }
 
+// ========== Excel 导出 ==========
+
+export async function exportExcel(date: string) {
+  const url = `${API_BASE}/export-excel/${date}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('导出 Excel 失败');
+  return res.blob();
+}
+
 // ========== 用户配置 ==========
 
 export async function fetchConfig() {

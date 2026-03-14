@@ -89,6 +89,61 @@ router.post('/upload-excel', async (req, res) => {
   }
 });
 
+// ========== Excel 导出 ==========
+
+router.get('/export-excel/:date', async (req, res) => {
+  try {
+    const { date } = req.params;
+    const prices = getPricesByDate(date);
+
+    if (!prices || prices.length === 0) {
+      return res.status(404).json({ code: 404, message: '该日期暂无数据' });
+    }
+
+    const ExcelJS = (await import('exceljs')).default;
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('存单价格');
+
+    // 设置表头
+    worksheet.columns = [
+      { header: '存单代码', key: 'issue_code', width: 15 },
+      { header: '存单简称', key: 'issue_name', width: 20 },
+      { header: '发行日期', key: 'issue_date', width: 12 },
+      { header: '期限', key: 'tenor', width: 10 },
+      { header: '发行价格', key: 'price', width: 10 },
+      { header: '参考收益率', key: 'ref_yield', width: 12 },
+      { header: '计划发行量', key: 'volume', width: 12 },
+      { header: '评级', key: 'rating', width: 10 },
+      { header: '银行名称', key: 'bank_name', width: 15 }
+    ];
+
+    // 添加数据
+    prices.forEach(price => {
+      worksheet.addRow({
+        issue_code: price.issue_code || '',
+        issue_name: price.issue_name || '',
+        issue_date: price.issue_date || '',
+        tenor: price.tenor || '',
+        price: price.price || '',
+        ref_yield: price.ref_yield || '',
+        volume: price.volume || '',
+        rating: price.rating || '',
+        bank_name: price.bank_name || ''
+      });
+    });
+
+    // 生成 buffer
+    const buffer = await workbook.xlsx.writeBuffer();
+
+    // 设置响应头
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="cd_quote_${date}.xlsx"`);
+    res.send(buffer);
+  } catch (error) {
+    res.status(500).json({ code: 500, message: error.message });
+  }
+});
+
 // ========== 用户配置 API ==========
 
 router.get('/config', (req, res) => {
