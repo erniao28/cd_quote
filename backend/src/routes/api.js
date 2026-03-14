@@ -96,10 +96,6 @@ router.get('/export-excel/:date', async (req, res) => {
     const { date } = req.params;
     const prices = getPricesByDate(date);
 
-    if (!prices || prices.length === 0) {
-      return res.status(404).json({ code: 404, message: '该日期暂无数据' });
-    }
-
     const ExcelJS = (await import('exceljs')).default;
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('存单价格');
@@ -117,20 +113,22 @@ router.get('/export-excel/:date', async (req, res) => {
       { header: '银行名称', key: 'bank_name', width: 15 }
     ];
 
-    // 添加数据
-    prices.forEach(price => {
-      worksheet.addRow({
-        issue_code: price.issue_code || '',
-        issue_name: price.issue_name || '',
-        issue_date: price.issue_date || '',
-        tenor: price.tenor || '',
-        price: price.price || '',
-        ref_yield: price.ref_yield || '',
-        volume: price.volume || '',
-        rating: price.rating || '',
-        bank_name: price.bank_name || ''
+    // 添加数据（如果没有数据，只导出表头）
+    if (prices && prices.length > 0) {
+      prices.forEach(price => {
+        worksheet.addRow({
+          issue_code: price.issue_code || '',
+          issue_name: price.issue_name || '',
+          issue_date: price.issue_date || '',
+          tenor: price.tenor || '',
+          price: price.price || '',
+          ref_yield: price.ref_yield || '',
+          volume: price.volume || '',
+          rating: price.rating || '',
+          bank_name: price.bank_name || ''
+        });
       });
-    });
+    }
 
     // 生成 buffer
     const buffer = await workbook.xlsx.writeBuffer();
