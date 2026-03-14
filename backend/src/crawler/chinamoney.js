@@ -192,7 +192,8 @@ export async function crawlChinamoney(targetDate) {
 export async function parseExcelFile(buffer) {
   // 使用 exceljs 解析 Excel
   const ExcelJS = (await import('exceljs')).default;
-  const workbook = await workbook.xlsx.load(buffer);
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
   const worksheet = workbook.getWorksheet(1);
 
   const prices = [];
