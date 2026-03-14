@@ -101,6 +101,11 @@ export async function crawlChinamoney(targetDate) {
 
     console.log(`[爬虫] 找到 ${items.length} 条记录`);
 
+    // 如果没有找到数据，抛出错误
+    if (items.length === 0) {
+      throw new Error('未找到存单数据，网站可能需要登录或存在反爬机制');
+    }
+
     // 遍历每个存单获取详情
     const prices = [];
     for (const item of items) {
