@@ -10,7 +10,7 @@ import { initDatabase } from './database.js';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3002;
 const HOST = process.env.HOST || '127.0.0.1';
 
 // 配置 CORS - 支持本地开发和生产环境（Nginx 代理）
@@ -25,7 +25,7 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // API 路由
-app.use('/api', apiRouter);
+app.use(apiRouter);  // 根路径，与一级报价系统架构一致
 
 // 健康检查
 app.get('/health', (req, res) => {

@@ -1,9 +1,7 @@
-// 后端 API 服务 - 生产环境配置
-
-// 本地开发用 localhost:3002，生产环境通过 Nginx /auto-quote-api 路径访问
+// 本地开发用 localhost:3002（根路径），生产环境通过 Nginx /auto-quote-api 路径访问
 const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 const API_BASE = isDev
-  ? `http://localhost:3002/api`
+  ? `http://localhost:3002`
   : `/auto-quote-api`;
 
 // ========== 价格数据 API ==========
@@ -56,7 +54,13 @@ export async function uploadExcel(excelData: string) {
 export async function exportExcel(date: string) {
   const url = `${API_BASE}/export-excel/${date}`;
   const res = await fetch(url);
-  if (!res.ok) throw new Error('导出 Excel 失败');
+
+  // 尝试获取错误详情
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({ message: '导出 Excel 失败' }));
+    throw new Error(errorData.message || '导出 Excel 失败');
+  }
+
   return res.blob();
 }
 
