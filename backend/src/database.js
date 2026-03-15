@@ -59,6 +59,24 @@ export async function initDatabase() {
     )
   `);
 
+  // 创建临时报价表（所有用户共享，只保留最新一份）
+  db.run(`
+    CREATE TABLE IF NOT EXISTS temp_quotes (
+      id TEXT PRIMARY KEY,
+      issue_code TEXT,           -- 存单代码
+      issue_name TEXT,           -- 存单简称
+      issue_date TEXT,           -- 发行日期
+      tenor TEXT,                -- 期限
+      ref_yield TEXT,            -- 参考收益率
+      volume TEXT,               -- 计划发行量
+      rating TEXT,               -- 主体评级
+      price TEXT,                -- 发行价格（元）
+      bank_name TEXT,            -- 银行名称
+      created_at INTEGER,
+      updated_at INTEGER
+    )
+  `);
+
   saveDatabase();
   console.log('[数据库] 初始化完成');
 }
@@ -210,4 +228,82 @@ export function saveUserConfig(config) {
 
   stmt.free();
   saveDatabase();
+}
+
+// ========== 临时报价操作（所有用户共享） ==========
+
+// 获取所有临时报价
+export function getTempQuotes() {
+  const stmt = db.prepare('SELECT * FROM temp_quotes ORDER BY issue_code');
+  const results = [];
+
+  while (stmt.step()) {
+    const row = stmt.getAsObject();
+    results.push(row);
+  }
+  stmt.free();
+
+  return results;
+}
+
+// 保存/更新临时报价（覆盖所有现有数据，只保留最新一份）
+export function saveTempQuotes(prices) {
+  // 先清空现有临时数据
+  db.run('DELETE FROM temp_quotes');
+
+  // 批量插入新数据
+  const stmt = db.prepare(`
+    INSERT INTO temp_quotes
+    (id, issue_code, issue_name, issue_date, tenor, ref_yield, volume, rating, price, bank_name, created_at, updated_at)
+    VALUES (@id, @issue_code, @issue_name, @issue_date, @tenor, @ref_yield, @volume, @rating, @price, @bank_name, @created_at, @updated_at)
+  `);
+
+  const now = Date.now();
+  prices.forEach(price => {
+    stmt.run({
+      '@id': price.id || `${price.issue_code}_${now}`,
+      '@issue_code': price.issue_code,
+      '@issue_name': price.issue_name,
+      '@issue_date': price.issue_date,
+      '@tenor': price.tenor,
+      '@ref_yield': price.ref_yield,
+      '@volume': price.volume,
+      '@rating': price.rating,
+      '@price': price.price,
+      '@bank_name': price.bank_name,
+      '@created_at': now,
+      '@updated_at': now
+    });
+  });
+
+  stmt.free();
+  saveDatabase();
+}
+
+// 删除临时报价
+export function deleteTempQuote(id) {
+  const stmt = db.prepare('DELETE FROM temp_quotes WHERE id = ?');
+  stmt.run([id]);
+  stmt.free();
+  saveDatabase();
+}
+
+// 清空所有临时报价
+export function clearTempQuotes() {
+  db.run('DELETE FROM temp_quotes');
+  saveDatabase();
+}
+
+// 确认临时报价（转移到正式表）
+export function confirmTempQuotes() {
+  const tempQuotes = getTempQuotes();
+
+  tempQuotes.forEach(price => {
+    insertDailyPrice(price);
+  });
+
+  // 确认后清空临时表
+  clearTempQuotes();
+
+  return tempQuotes.length;
 }

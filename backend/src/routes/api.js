@@ -5,7 +5,12 @@ import {
   getLatestPrices,
   getUserConfig,
   saveUserConfig,
-  getCrawlHistory
+  getCrawlHistory,
+  getTempQuotes,
+  saveTempQuotes,
+  deleteTempQuote,
+  clearTempQuotes,
+  confirmTempQuotes
 } from '../database.js';
 import { manualCrawl } from '../crawler/scheduler.js';
 import { parseExcelFile, savePrices, extractBankName } from '../crawler/chinamoney.js';
@@ -91,10 +96,20 @@ router.post('/upload-excel', async (req, res) => {
 
 // ========== Excel 导出 ==========
 
+// 导出正式数据
 router.get('/export-excel/:date', async (req, res) => {
   try {
     const { date } = req.params;
+
+    // 验证日期格式
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({ code: 400, message: '日期格式不正确，应为 YYYY-MM-DD' });
+    }
+
+    console.log(`[导出 Excel] 请求日期：${date}`);
+
     const prices = getPricesByDate(date);
+    console.log(`[导出 Excel] 查询到 ${prices.length} 条数据`);
 
     const ExcelJS = (await import('exceljs')).default;
     const workbook = new ExcelJS.Workbook();
@@ -132,12 +147,72 @@ router.get('/export-excel/:date', async (req, res) => {
 
     // 生成 buffer
     const buffer = await workbook.xlsx.writeBuffer();
+    console.log(`[导出 Excel] 生成成功，大小：${buffer.length} bytes`);
 
     // 设置响应头
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="cd_quote_${date}.xlsx"`);
     res.send(buffer);
   } catch (error) {
+    console.error('[导出 Excel] 错误:', error);
+    res.status(500).json({ code: 500, message: error.message });
+  }
+});
+
+// 导出临时报价（在线编辑后的数据）
+router.get('/export-temp-excel', async (req, res) => {
+  try {
+    const { date } = req.query;
+
+    console.log(`[导出临时 Excel] 请求日期：${date}`);
+
+    const prices = getTempQuotes();
+    console.log(`[导出临时 Excel] 查询到 ${prices.length} 条数据`);
+
+    const ExcelJS = (await import('exceljs')).default;
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('存单价格');
+
+    // 设置表头
+    worksheet.columns = [
+      { header: '存单代码', key: 'issue_code', width: 15 },
+      { header: '存单简称', key: 'issue_name', width: 20 },
+      { header: '发行日期', key: 'issue_date', width: 12 },
+      { header: '期限', key: 'tenor', width: 10 },
+      { header: '发行价格', key: 'price', width: 10 },
+      { header: '参考收益率', key: 'ref_yield', width: 12 },
+      { header: '计划发行量', key: 'volume', width: 12 },
+      { header: '评级', key: 'rating', width: 10 },
+      { header: '银行名称', key: 'bank_name', width: 15 }
+    ];
+
+    // 添加数据
+    if (prices && prices.length > 0) {
+      prices.forEach(price => {
+        worksheet.addRow({
+          issue_code: price.issue_code || '',
+          issue_name: price.issue_name || '',
+          issue_date: price.issue_date || date || '',
+          tenor: price.tenor || '',
+          price: price.price || '',
+          ref_yield: price.ref_yield || '',
+          volume: price.volume || '',
+          rating: price.rating || '',
+          bank_name: price.bank_name || ''
+        });
+      });
+    }
+
+    // 生成 buffer
+    const buffer = await workbook.xlsx.writeBuffer();
+    console.log(`[导出临时 Excel] 生成成功，大小：${buffer.length} bytes`);
+
+    // 设置响应头
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="cd_quote_temp_${date || 'draft'}.xlsx"`);
+    res.send(buffer);
+  } catch (error) {
+    console.error('[导出临时 Excel] 错误:', error);
     res.status(500).json({ code: 500, message: error.message });
   }
 });
@@ -194,6 +269,65 @@ router.post('/match-bank', (req, res) => {
     const { name } = req.body;
     const bankName = extractBankName(name);
     res.json({ code: 200, data: { bankName }, message: 'success' });
+  } catch (error) {
+    res.status(500).json({ code: 500, message: error.message });
+  }
+});
+
+// ========== 临时报价管理（所有用户共享） ==========
+
+// 获取临时报价
+router.get('/temp-quotes', (req, res) => {
+  try {
+    const quotes = getTempQuotes();
+    res.json({ code: 200, data: quotes, message: 'success' });
+  } catch (error) {
+    res.status(500).json({ code: 500, message: error.message });
+  }
+});
+
+// 保存临时报价（覆盖所有现有数据）
+router.post('/temp-quotes', async (req, res) => {
+  try {
+    const { quotes } = req.body;  // 报价数组
+
+    if (!quotes || !Array.isArray(quotes)) {
+      return res.status(400).json({ code: 400, message: '数据格式不正确' });
+    }
+
+    saveTempQuotes(quotes);
+    res.json({ code: 200, data: { count: quotes.length }, message: '保存成功' });
+  } catch (error) {
+    res.status(500).json({ code: 500, message: error.message });
+  }
+});
+
+// 删除单条临时报价
+router.delete('/temp-quotes/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    deleteTempQuote(id);
+    res.json({ code: 200, message: '删除成功' });
+  } catch (error) {
+    res.status(500).json({ code: 500, message: error.message });
+  }
+});
+
+// 清空所有临时报价
+router.delete('/temp-quotes', (req, res) => {
+  try {
+    clearTempQuotes();
+    res.json({ code: 200, message: '清空成功' });
+  } catch (error) {
+    res.status(500).json({ code: 500, message: error.message });
+  }
+});
+
+// 确认临时报价（转入正式表）
+router.post('/temp-quotes/confirm', (req, res) => {
+  try {
+    const count = confirmTempQuotes();
+    res.json({ code: 200, data: { count }, message: `已确认 ${count} 条报价` });
   } catch (error) {
     res.status(500).json({ code: 500, message: error.message });
   }

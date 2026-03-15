@@ -109,3 +109,58 @@ export async function matchBankName(name: string) {
   if (!res.ok) throw new Error('匹配银行名称失败');
   return res.json();
 }
+
+// ========== 临时报价管理（在线编辑） ==========
+
+// 获取临时报价
+export async function fetchTempQuotes() {
+  const res = await fetch(`${API_BASE}/temp-quotes`);
+  if (!res.ok) throw new Error('获取临时报价失败');
+  return res.json();
+}
+
+// 保存临时报价
+export async function saveTempQuotes(quotes: any[]) {
+  const res = await fetch(`${API_BASE}/temp-quotes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ quotes })
+  });
+  if (!res.ok) throw new Error('保存临时报价失败');
+  return res.json();
+}
+
+// 删除单条临时报价
+export async function deleteTempQuote(id: string) {
+  const res = await fetch(`${API_BASE}/temp-quotes/${id}`, {
+    method: 'DELETE'
+  });
+  if (!res.ok) throw new Error('删除临时报价失败');
+  return res.json();
+}
+
+// 清空所有临时报价
+export async function clearTempQuotes() {
+  const res = await fetch(`${API_BASE}/temp-quotes`, {
+    method: 'DELETE'
+  });
+  if (!res.ok) throw new Error('清空临时报价失败');
+  return res.json();
+}
+
+// 确认临时报价（转入正式表）
+export async function confirmTempQuotes() {
+  const res = await fetch(`${API_BASE}/temp-quotes/confirm`, {
+    method: 'POST'
+  });
+  if (!res.ok) throw new Error('确认临时报价失败');
+  return res.json();
+}
+
+// 导出临时报价 Excel
+export async function exportTempExcel(date?: string) {
+  const url = date ? `${API_BASE}/export-temp-excel?date=${date}` : `${API_BASE}/export-temp-excel`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('导出临时 Excel 失败');
+  return res.blob();
+}

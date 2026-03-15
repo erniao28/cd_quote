@@ -6,10 +6,14 @@ import {
   triggerCrawl,
   fetchCrawlHistory,
   getNextWorkday,
-  exportExcel
+  exportExcel,
+  fetchTempQuotes,
+  saveTempQuotes,
+  exportTempExcel
 } from './services/api';
 import { InputParser } from './components/InputParser';
 import { OutputEditor } from './components/OutputEditor';
+import { TempQuoteEditor } from './components/TempQuoteEditor';
 
 const App: React.FC = () => {
   const [prices, setPrices] = useState<DailyPrice[]>([]);
@@ -23,6 +27,9 @@ const App: React.FC = () => {
   // 输入解析相关
   const [parsedItems, setParsedItems] = useState<ParsedLine[]>([]);
   const [activeTab, setActiveTab] = useState<'crawler' | 'parser'>('crawler');
+
+  // 在线编辑相关
+  const [showTempEditor, setShowTempEditor] = useState(false);
 
   // 初始化加载数据
   useEffect(() => {
@@ -102,6 +109,34 @@ const App: React.FC = () => {
       window.URL.revokeObjectURL(url);
     } catch (error: any) {
       alert(`导出失败：${error.message}`);
+    }
+  };
+
+  // 导入临时表并打开编辑器
+  const handleOpenEditor = async () => {
+    if (!targetDate) {
+      alert('请先选择目标日期');
+      return;
+    }
+
+    try {
+      // 先获取正式数据
+      const res = await fetchPrices(targetDate);
+      const prices = res.data || [];
+
+      if (prices.length === 0) {
+        if (!confirm('当前日期没有正式数据，是否打开空编辑器手动添加？')) {
+          return;
+        }
+        setShowTempEditor(true);
+        return;
+      }
+
+      // 保存到临时表
+      await saveTempQuotes(prices);
+      setShowTempEditor(true);
+    } catch (error: any) {
+      alert(`导入失败：${error.message}`);
     }
   };
 
@@ -197,6 +232,17 @@ const App: React.FC = () => {
                     导出 Excel 模板
                   </button>
                 )}
+                {/* 在线编辑按钮 - 始终显示 */}
+                <button
+                  onClick={handleOpenEditor}
+                  disabled={!targetDate}
+                  className="w-full mt-3 py-3 bg-orange-500 text-white rounded-2xl font-bold text-sm hover:bg-orange-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  在线编辑
+                </button>
               </section>
 
               {/* 爬取历史 */}
@@ -288,6 +334,14 @@ const App: React.FC = () => {
           </div>
         )}
       </main>
+
+      {/* 在线编辑器模态框 */}
+      {showTempEditor && (
+        <TempQuoteEditor
+          targetDate={targetDate}
+          onClose={() => setShowTempEditor(false)}
+        />
+      )}
 
       <footer className="p-8 text-center text-[10px] text-slate-300 font-bold uppercase tracking-widest">
         CD.Quote • 货币网爬虫系统
