@@ -9,11 +9,14 @@ interface PriceData {
   tenor: string;
   price: string;
   bank_name: string;
+  ref_yield?: string;
+  volume?: string;
+  rating?: string;
 }
 
 interface Props {
   onParsed: (results: ParsedLine[]) => void;
-  issueDate?: string;  // 新增：发行日期
+  issueDate?: string;
 }
 
 export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
@@ -21,6 +24,8 @@ export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
   const [parsedResults, setParsedResults] = useState<ParsedLine[]>([]);
   const [showPreview, setShowPreview] = useState(false);
   const [priceData, setPriceData] = useState<PriceData[]>([]);
+  const [matchedResults, setMatchedResults] = useState<ParsedLine[]>([]);
+  const [showMatchModal, setShowMatchModal] = useState(false);
 
   // 加载最新价格数据用于匹配
   useEffect(() => {
@@ -36,56 +41,58 @@ export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
   }, []);
 
   // 根据银行名称和期限匹配价格数据
-  const matchPriceData = (bankName: string, tenor: string): PriceData | null => {
-    // 期限标准化匹配
+  const matchPriceData = (bankName: string, tenor: string): PriceData[] => {
+    // 期限标准化映射
     const tenorMap: Record<string, string[]> = {
-      '1M': ['1M', '1 个月', '30 天'],
+      '1M': ['1M', '1 个月', '30 天', '0.25Y'],
       '2M': ['2M', '2 个月', '60 天'],
-      '3M': ['3M', '3 个月', '90 天'],
+      '3M': ['3M', '3 个月', '90 天', '0.5Y'],
       '4M': ['4M', '4 个月', '120 天'],
-      '5M': ['5M', '5 个月', '150 天'],
-      '6M': ['6M', '6 个月', '180 天'],
+      '5M': ['5M', '5 个月', '150 天', '0.75Y'],
+      '6M': ['6M', '6 个月', '180 天', '0.5Y', '半年'],
       '7M': ['7M', '7 个月', '210 天'],
       '8M': ['8M', '8 个月', '240 天'],
-      '9M': ['9M', '9 个月', '270 天'],
+      '9M': ['9M', '9 个月', '270 天', '0.75Y'],
       '10M': ['10M', '10 个月', '300 天'],
       '11M': ['11M', '11 个月', '330 天'],
-      '1Y': ['1Y', '1 年', '12M', '365 天'],
+      '1Y': ['1Y', '1 年', '12M', '365 天', '年'],
     };
 
     const targetTenors = tenorMap[tenor] || [tenor];
 
-    return priceData.find(item => {
-      // 银行名称匹配（简称包含即可）
-      const bankMatch = item.bank_name.includes(bankName) || item.issue_name.includes(bankName);
+    // 找出所有匹配的项，返回多个供用户选择
+    return priceData.filter(item => {
+      // 银行名称匹配
+      const bankMatch = item.bank_name.includes(bankName) ||
+                        item.issue_name.includes(bankName) ||
+                        item.issue_name.includes(bankName.replace('银行', ''));
       // 期限匹配
-      const tenorMatch = targetTenors.some(t => item.tenor.includes(t) || tenor.includes(item.tenor));
-      return bankMatch && tenorMatch;
-    }) || null;
+      const tenorMatch = targetTenors.some(t => item.tenor.includes(t)) ||
+                         targetTenors.some(t => tenor.includes(item.tenor));
+      return bankMatch || tenorMatch;
+    });
   };
 
   const handleParse = () => {
     const results = parseBatchInput(inputText);
-
-    // 自动匹配价格数据
-    const matchedResults = results.map(item => {
-      const matched = matchPriceData(item.bankName, item.tenor);
-      if (matched) {
-        return {
-          ...item,
-          matched: true,
-          issueCode: matched.issue_code,
-          issueName: matched.issue_name,
-          price: matched.price,
-          issueDate: matched.issue_date || issueDate
-        };
-      }
-      return item;
-    });
-
-    setParsedResults(matchedResults);
+    setParsedResults(results);
     setShowPreview(true);
-    onParsed(matchedResults);
+    setMatchedResults([]);  // 清空之前的匹配结果
+    onParsed(results);
+  };
+
+  // 打开匹配弹窗
+  const handleMatch = () => {
+    const results = parsedResults.map(item => {
+      const matches = matchPriceData(item.bankName, item.tenor);
+      return {
+        ...item,
+        _matches: matches,  // 附加匹配到的数据
+        matched: matches.length > 0
+      };
+    });
+    setMatchedResults(results);
+    setShowMatchModal(true);
   };
 
   const handleClear = () => {
@@ -149,6 +156,13 @@ export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
           className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all"
         >
           解析输入
+        </button>
+        <button
+          onClick={handleMatch}
+          disabled={!showPreview || parsedResults.length === 0}
+          className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all disabled:opacity-50"
+        >
+          匹配数据
         </button>
         <button
           onClick={handleClear}
@@ -240,6 +254,166 @@ export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
           </div>
         </div>
       )}
+
+      {/* 匹配结果弹窗 */}
+      {showMatchModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+            {/* 头部 */}
+            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-bold text-slate-800">匹配数据</h3>
+                <p className="text-sm text-slate-500 mt-1">
+                  为每条报价选择匹配的数据，支持手动调整
+                </p>
+              </div>
+              <button
+                onClick={() => setShowMatchModal(false)}
+                className="p-2 hover:bg-slate-100 rounded-xl transition"
+              >
+                <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* 匹配列表 */}
+            <div className="flex-1 overflow-auto p-6">
+              {matchedResults.map((result, idx) => (
+                <MatchItem
+                  key={idx}
+                  parsedItem={result}
+                  matches={result._matches || []}
+                  issueDate={issueDate}
+                  onConfirm={(matchedData) => {
+                    // 确认匹配后，更新 parsedResults
+                    const updated = [...parsedResults];
+                    updated[idx] = {
+                      ...updated[idx],
+                      issueCode: matchedData.issue_code,
+                      issueName: matchedData.issue_name,
+                      issueDate: matchedData.issue_date || issueDate,
+                      price: matchedData.price,
+                      refYield: matchedData.ref_yield,
+                      volume: matchedData.volume,
+                      rating: matchedData.rating,
+                      tenor: matchedData.tenor,
+                      matched: true
+                    };
+                    setParsedResults(updated);
+                    onParsed(updated);
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* 底部按钮 */}
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowMatchModal(false);
+                  onParsed(parsedResults);
+                }}
+                className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700"
+              >
+                确认并关闭
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
+  );
+};
+
+// 匹配项组件
+const MatchItem: React.FC<{
+  parsedItem: ParsedLine & { _matches?: PriceData[] };
+  matches: PriceData[];
+  issueDate?: string;
+  onConfirm: (data: PriceData) => void;
+}> = ({ parsedItem, matches, issueDate, onConfirm }) => {
+  const [selectedMatch, setSelectedMatch] = useState<PriceData | null>(
+    matches[0] || null
+  );
+
+  return (
+    <div className="mb-6 p-4 bg-slate-50 rounded-xl border border-slate-200">
+      {/* 解析结果 */}
+      <div className="mb-3">
+        <div className="text-xs font-bold text-slate-500 mb-2">解析结果</div>
+        <div className="flex flex-wrap gap-2 items-center">
+          <span className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700">
+            {parsedItem.bankName}
+          </span>
+          <span className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-sm font-bold text-indigo-600">
+            {parsedItem.tenor}
+          </span>
+          {parsedItem.yield && (
+            <span className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-sm font-bold text-emerald-600">
+              {parsedItem.yield}
+            </span>
+          )}
+          {parsedItem.rating && (
+            <span className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-sm text-slate-600">
+              {parsedItem.rating}
+            </span>
+          )}
+          {parsedItem.volume && (
+            <span className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-sm text-slate-600">
+              {parsedItem.volume}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* 匹配到的数据 */}
+      <div>
+        <div className="text-xs font-bold text-slate-500 mb-2">
+          匹配到的数据 ({matches.length})
+        </div>
+        {matches.length === 0 ? (
+          <div className="text-sm text-amber-600">未找到匹配的数据，请手动输入</div>
+        ) : (
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {matches.map((match, idx) => (
+              <label
+                key={idx}
+                className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition ${
+                  selectedMatch?.issue_code === match.issue_code
+                    ? 'bg-indigo-50 border-indigo-300'
+                    : 'bg-white border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name={`match_${parsedItem.bankName}_${idx}`}
+                  checked={selectedMatch?.issue_code === match.issue_code}
+                  onChange={() => setSelectedMatch(match)}
+                  className="w-4 h-4 text-indigo-600"
+                />
+                <div className="flex-1 flex flex-wrap gap-3 text-sm">
+                  <span className="font-bold text-slate-800">{match.issue_code}</span>
+                  <span className="text-slate-700">{match.issue_name}</span>
+                  <span className="text-indigo-600 font-bold">{match.tenor}</span>
+                  <span className="text-emerald-600 font-bold">{match.price || match.ref_yield}</span>
+                  <span className="text-slate-400 text-xs">发行：{match.issue_date || issueDate}</span>
+                </div>
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* 确认按钮 */}
+      {selectedMatch && (
+        <button
+          onClick={() => onConfirm(selectedMatch)}
+          className="mt-3 w-full py-2 bg-emerald-500 text-white rounded-xl font-bold text-sm hover:bg-emerald-600 transition"
+        >
+          确认选择：{selectedMatch.issue_code} {selectedMatch.issue_name}
+        </button>
+      )}
+    </div>
   );
 };
