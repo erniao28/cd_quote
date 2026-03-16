@@ -11,12 +11,29 @@ export const OutputEditor: React.FC<Props> = ({ items, issueDate }) => {
   const [selected, setSelected] = useState<number[]>([]);
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [outputFormat, setOutputFormat] = useState<'default' | 'compact'>('default');
+  const [settlementOffset, setSettlementOffset] = useState(2);  // 默认 T+2
+  const [customSettlementDate, setCustomSettlementDate] = useState('');
 
-  // 计算发行日期 +2 个工作日（简化版，直接 +2 天）
-  const calculateSettlementDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    date.setDate(date.getDate() + 2);
+  // 计算交割日期（发行日期 + 偏移天数）
+  const calculateSettlementDate = (dateStr: string, offset: number = settlementOffset) => {
+    // 优先使用自定义日期
+    if (customSettlementDate) {
+      return customSettlementDate;
+    }
+    const date = new Date(dateStr || issueDate);
+    date.setDate(date.getDate() + offset);
     return date.toISOString().split('T')[0];
+  };
+
+  // 批量设置交割日期偏移
+  const handleSetOffset = (offset: number) => {
+    setSettlementOffset(offset);
+    setCustomSettlementDate('');
+  };
+
+  // 批量设置自定义交割日期
+  const handleSetCustomDate = (date: string) => {
+    setCustomSettlementDate(date);
   };
 
   const handleMoveUp = (index: number) => {
@@ -48,7 +65,15 @@ export const OutputEditor: React.FC<Props> = ({ items, issueDate }) => {
   const handleCopy = () => {
     const output = order.map((idx) => {
       const item = items[idx];
-      const settlementDate = calculateSettlementDate(issueDate);
+      const settlementDate = calculateSettlementDate(item.issueDate || issueDate);
+
+      // 如果匹配到了完整数据，输出标准化格式
+      if (item.issueCode && item.issueName && item.price) {
+        // 标准化格式：代码 简称 期限 收益率 价格 交割日期
+        return `${item.issueCode} ${item.issueName} ${item.tenor} ${item.yield || item.rating || ''} ${item.price} ${settlementDate}+${settlementOffset}`;
+      }
+
+      // 原始格式
       const parts = [
         item.bankName || '',
         item.rating || '',
@@ -104,6 +129,67 @@ export const OutputEditor: React.FC<Props> = ({ items, issueDate }) => {
         </div>
       </div>
 
+      {/* 交割日期批量修改 */}
+      <div className="mb-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
+        <div className="flex items-center gap-4 flex-wrap">
+          <span className="text-xs font-bold text-slate-600">交割日期:</span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleSetOffset(0)}
+              className={`px-3 py-1 text-xs rounded-lg font-bold transition-all ${
+                settlementOffset === 0 && !customSettlementDate ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              T+0
+            </button>
+            <button
+              onClick={() => handleSetOffset(1)}
+              className={`px-3 py-1 text-xs rounded-lg font-bold transition-all ${
+                settlementOffset === 1 && !customSettlementDate ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              T+1
+            </button>
+            <button
+              onClick={() => handleSetOffset(2)}
+              className={`px-3 py-1 text-xs rounded-lg font-bold transition-all ${
+                settlementOffset === 2 && !customSettlementDate ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              T+2
+            </button>
+            <button
+              onClick={() => handleSetOffset(3)}
+              className={`px-3 py-1 text-xs rounded-lg font-bold transition-all ${
+                settlementOffset === 3 && !customSettlementDate ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              T+3
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500">自定义:</span>
+            <input
+              type="date"
+              value={customSettlementDate}
+              onChange={(e) => handleSetCustomDate(e.target.value)}
+              className="text-xs bg-white border border-slate-200 rounded px-2 py-1"
+            />
+            {customSettlementDate && (
+              <button
+                onClick={() => { setCustomSettlementDate(''); setSettlementOffset(2); }}
+                className="text-xs text-red-500 hover:text-red-600"
+              >
+                清除
+              </button>
+            )}
+          </div>
+          <span className="text-xs text-slate-400 ml-2">
+            当前：{customSettlementDate || `T+${settlementOffset}`}
+          </span>
+        </div>
+      </div>
+
       {/* 格式选择 */}
       <div className="flex gap-2 mb-4">
         <div className="flex bg-slate-100 p-1 rounded-xl">
@@ -131,13 +217,16 @@ export const OutputEditor: React.FC<Props> = ({ items, issueDate }) => {
         {order.map((originalIndex, displayIndex) => {
           const item = items[originalIndex];
           const isSelected = selected.includes(originalIndex);
-          const settlementDate = calculateSettlementDate(issueDate);
+          const settlementDate = calculateSettlementDate(item.issueDate || issueDate);
+
+          // 是否匹配到完整数据
+          const hasFullData = item.issueCode && item.issueName && item.price;
 
           return (
             <div
               key={originalIndex}
               className={`p-3 rounded-xl border flex items-center gap-2 ${
-                isSelected ? 'border-indigo-300 bg-indigo-50' : 'border-slate-200 bg-white'
+                isSelected ? 'border-indigo-300 bg-indigo-50' : hasFullData ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-white'
               }`}
             >
               {/* 序号和选择框 */}
@@ -155,7 +244,19 @@ export const OutputEditor: React.FC<Props> = ({ items, issueDate }) => {
 
               {/* 内容 */}
               <div className="flex-1 font-mono text-sm">
-                {outputFormat === 'default' ? (
+                {hasFullData ? (
+                  // 匹配到完整数据的显示
+                  <div className="flex flex-wrap gap-3 items-center">
+                    <span className="font-bold text-emerald-600">✓</span>
+                    <span className="font-bold text-slate-800">{item.issueCode}</span>
+                    <span className="text-slate-700">{item.issueName}</span>
+                    <span className="text-indigo-600 font-bold">{item.tenor}</span>
+                    <span className="text-emerald-600 font-bold">{item.yield || item.price}</span>
+                    <span className="text-slate-500">{item.price}</span>
+                    <span className="text-xs text-slate-400">交割：{settlementDate}</span>
+                  </div>
+                ) : (
+                  // 未匹配到完整数据的显示
                   <div className="flex flex-wrap gap-3">
                     <span className="font-bold text-slate-800">{item.bankName || '-'}</span>
                     <span className="text-slate-500">{item.rating || '-'}</span>
@@ -163,11 +264,7 @@ export const OutputEditor: React.FC<Props> = ({ items, issueDate }) => {
                     <span className="text-indigo-600 font-bold">{item.tenor || '-'}</span>
                     <span className="text-emerald-600 font-bold">{item.yield || '-'}</span>
                     <span className="text-slate-400">{item.volume ? `${item.volume} +` : '-'}</span>
-                    <span className="text-xs text-slate-400">起息：{settlementDate}</span>
-                  </div>
-                ) : (
-                  <div className="text-slate-700">
-                    {item.bankName} {item.rating} {item.weekday} {item.tenor} {item.yield} {item.volume && `${item.volume}+`}
+                    <span className="text-xs text-slate-400">交割：{settlementDate}</span>
                   </div>
                 )}
               </div>
@@ -205,7 +302,7 @@ export const OutputEditor: React.FC<Props> = ({ items, issueDate }) => {
 
       {/* 提示信息 */}
       <p className="text-xs text-slate-400 mt-4">
-        💡 提示：勾选项目后点击"重新编号"可按顺序编号 1,2,3... 点击"复制"输出最终格式
+        💡 提示：匹配到数据会显示 ✓ 和完整要素，点击"复制"输出标准格式（代码 简称 期限 收益率 价格 交割日）
       </p>
     </section>
   );

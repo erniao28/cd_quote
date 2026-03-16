@@ -33,7 +33,8 @@ export async function initDatabase() {
       price TEXT,                -- 发行价格（元）
       bank_name TEXT,            -- 银行名称（从简称提取）
       created_at INTEGER,
-      updated_at INTEGER
+      updated_at INTEGER,
+      UNIQUE(issue_code, issue_date)  -- 唯一约束：相同代码 + 日期自动覆盖
     )
   `);
 
@@ -96,6 +97,9 @@ export function saveDatabase() {
 // ========== 每日价格操作 ==========
 
 export function insertDailyPrice(price) {
+  // 使用 issue_code + issue_date 生成固定 ID，实现自动去重
+  const uniqueId = `${price.issue_code || 'NO_CODE'}_${price.issue_date || 'NO_DATE'}`;
+
   const stmt = db.prepare(`
     INSERT OR REPLACE INTO daily_prices
     (id, issue_code, issue_name, issue_date, tenor, ref_yield, volume, rating, price, bank_name, created_at, updated_at)
@@ -103,7 +107,7 @@ export function insertDailyPrice(price) {
   `);
 
   stmt.run({
-    '@id': price.id,
+    '@id': uniqueId,
     '@issue_code': price.issue_code,
     '@issue_name': price.issue_name,
     '@issue_date': price.issue_date,

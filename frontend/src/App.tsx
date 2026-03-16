@@ -329,7 +329,7 @@ const App: React.FC = () => {
         ) : (
           /* 报价解析标签页 */
           <div className="col-span-12 lg:col-span-8 space-y-6">
-            <InputParser onParsed={handleParsed} />
+            <InputParser onParsed={handleParsed} issueDate={targetDate} />
             <OutputEditor items={parsedItems} issueDate={targetDate} />
           </div>
         )}

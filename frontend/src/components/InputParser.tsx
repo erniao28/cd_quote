@@ -1,20 +1,91 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ParsedLine, parseBatchInput, matchBankName, normalizeTenor, normalizeVolume } from '../utils/parser';
+import { fetchLatestPrices } from '../services/api';
+
+interface PriceData {
+  issue_code: string;
+  issue_name: string;
+  issue_date: string;
+  tenor: string;
+  price: string;
+  bank_name: string;
+}
 
 interface Props {
   onParsed: (results: ParsedLine[]) => void;
+  issueDate?: string;  // 新增：发行日期
 }
 
-export const InputParser: React.FC<Props> = ({ onParsed }) => {
+export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
   const [inputText, setInputText] = useState('');
   const [parsedResults, setParsedResults] = useState<ParsedLine[]>([]);
   const [showPreview, setShowPreview] = useState(false);
+  const [priceData, setPriceData] = useState<PriceData[]>([]);
+
+  // 加载最新价格数据用于匹配
+  useEffect(() => {
+    const loadPrices = async () => {
+      try {
+        const res = await fetchLatestPrices();
+        setPriceData(res.data || []);
+      } catch (error) {
+        console.error('加载价格数据失败:', error);
+      }
+    };
+    loadPrices();
+  }, []);
+
+  // 根据银行名称和期限匹配价格数据
+  const matchPriceData = (bankName: string, tenor: string): PriceData | null => {
+    // 期限标准化匹配
+    const tenorMap: Record<string, string[]> = {
+      '1M': ['1M', '1 个月', '30 天'],
+      '2M': ['2M', '2 个月', '60 天'],
+      '3M': ['3M', '3 个月', '90 天'],
+      '4M': ['4M', '4 个月', '120 天'],
+      '5M': ['5M', '5 个月', '150 天'],
+      '6M': ['6M', '6 个月', '180 天'],
+      '7M': ['7M', '7 个月', '210 天'],
+      '8M': ['8M', '8 个月', '240 天'],
+      '9M': ['9M', '9 个月', '270 天'],
+      '10M': ['10M', '10 个月', '300 天'],
+      '11M': ['11M', '11 个月', '330 天'],
+      '1Y': ['1Y', '1 年', '12M', '365 天'],
+    };
+
+    const targetTenors = tenorMap[tenor] || [tenor];
+
+    return priceData.find(item => {
+      // 银行名称匹配（简称包含即可）
+      const bankMatch = item.bank_name.includes(bankName) || item.issue_name.includes(bankName);
+      // 期限匹配
+      const tenorMatch = targetTenors.some(t => item.tenor.includes(t) || tenor.includes(item.tenor));
+      return bankMatch && tenorMatch;
+    }) || null;
+  };
 
   const handleParse = () => {
     const results = parseBatchInput(inputText);
-    setParsedResults(results);
+
+    // 自动匹配价格数据
+    const matchedResults = results.map(item => {
+      const matched = matchPriceData(item.bankName, item.tenor);
+      if (matched) {
+        return {
+          ...item,
+          matched: true,
+          issueCode: matched.issue_code,
+          issueName: matched.issue_name,
+          price: matched.price,
+          issueDate: matched.issue_date || issueDate
+        };
+      }
+      return item;
+    });
+
+    setParsedResults(matchedResults);
     setShowPreview(true);
-    onParsed(results);
+    onParsed(matchedResults);
   };
 
   const handleClear = () => {

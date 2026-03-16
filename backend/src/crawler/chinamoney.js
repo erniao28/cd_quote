@@ -231,6 +231,10 @@ export async function parseExcelFile(buffer) {
  */
 export function savePrices(prices) {
   for (const price of prices) {
+    // 如果没有 issue_code，使用 issue_name + issue_date 生成
+    if (!price.issue_code) {
+      price.issue_code = `${price.issue_name}_${price.issue_date}`.replace(/\s/g, '');
+    }
     insertDailyPrice(price);
   }
   return prices;
