@@ -14,6 +14,8 @@ import {
 import { InputParser } from './components/InputParser';
 import { OutputEditor } from './components/OutputEditor';
 import { TempQuoteEditor } from './components/TempQuoteEditor';
+import { TempQuoteManager } from './components/TempQuoteManager';
+import { ExcelImportModal } from './components/ExcelImportModal';
 
 const App: React.FC = () => {
   const [prices, setPrices] = useState<DailyPrice[]>([]);
@@ -30,6 +32,7 @@ const App: React.FC = () => {
 
   // 在线编辑相关
   const [showTempEditor, setShowTempEditor] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   // 初始化加载数据
   useEffect(() => {
@@ -222,15 +225,26 @@ const App: React.FC = () => {
                   </p>
                 )}
                 {crawlStatus.showDownload && (
-                  <button
-                    onClick={handleExport}
-                    className="w-full mt-3 py-3 bg-emerald-500 text-white rounded-2xl font-bold text-sm hover:bg-emerald-600 transition-all flex items-center justify-center gap-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    导出 Excel 模板
-                  </button>
+                  <div className="flex gap-2 mt-3">
+                    <button
+                      onClick={handleExport}
+                      className="flex-1 py-3 bg-emerald-500 text-white rounded-2xl font-bold text-sm hover:bg-emerald-600 transition-all flex items-center justify-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      导出 Excel
+                    </button>
+                    <button
+                      onClick={() => setShowImportModal(true)}
+                      className="flex-1 py-3 bg-amber-500 text-white rounded-2xl font-bold text-sm hover:bg-amber-600 transition-all flex items-center justify-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l4-4 4 4m-4-4v12" />
+                      </svg>
+                      导入 Excel
+                    </button>
+                  </div>
                 )}
                 {/* 在线编辑按钮 - 始终显示 */}
                 <button
@@ -276,7 +290,8 @@ const App: React.FC = () => {
 
             {/* 右侧：数据展示 */}
             <div className="col-span-12 lg:col-span-8 space-y-4">
-              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm min-h-[700px]">
+              {/* 数据列表 */}
+              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm min-h-[400px]">
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
                     数据列表
@@ -324,6 +339,9 @@ const App: React.FC = () => {
                   </table>
                 </div>
               </div>
+
+              {/* 临时报价管理 */}
+              <TempQuoteManager onQuoteDeleted={loadData} />
             </div>
           </>
         ) : (
@@ -340,6 +358,18 @@ const App: React.FC = () => {
         <TempQuoteEditor
           targetDate={targetDate}
           onClose={() => setShowTempEditor(false)}
+        />
+      )}
+
+      {/* Excel 导入模态框 */}
+      {showImportModal && (
+        <ExcelImportModal
+          targetDate={targetDate}
+          onClose={() => setShowImportModal(false)}
+          onImportSuccess={() => {
+            loadData();
+            setShowImportModal(false);
+          }}
         />
       )}
 

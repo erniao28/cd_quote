@@ -86,9 +86,16 @@ router.post('/upload-excel', async (req, res) => {
     const buffer = Buffer.from(excelData, 'base64');
 
     const prices = await parseExcelFile(buffer);
-    savePrices(prices);
 
-    res.json({ code: 200, data: { count: prices.length }, message: 'success' });
+    // 返回解析后的数据，让前端预览
+    res.json({
+      code: 200,
+      data: {
+        count: prices.length,
+        parsedData: prices
+      },
+      message: 'success'
+    });
   } catch (error) {
     res.status(500).json({ code: 500, message: error.message });
   }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ParsedLine, parseBatchInput, matchBankName, normalizeTenor, normalizeVolume } from '../utils/parser';
-import { fetchLatestPrices } from '../services/api';
+import { fetchLatestPrices, fetchTempQuotes } from '../services/api';
 
 interface PriceData {
   issue_code: string;
@@ -12,6 +12,7 @@ interface PriceData {
   ref_yield?: string;
   volume?: string;
   rating?: string;
+  source?: 'official' | 'temp';  // 数据来源标记
 }
 
 interface Props {
@@ -23,22 +24,39 @@ export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
   const [inputText, setInputText] = useState('');
   const [parsedResults, setParsedResults] = useState<ParsedLine[]>([]);
   const [showPreview, setShowPreview] = useState(false);
-  const [priceData, setPriceData] = useState<PriceData[]>([]);
+  const [officialData, setOfficialData] = useState<PriceData[]>([]);
+  const [tempData, setTempData] = useState<PriceData[]>([]);
   const [matchedResults, setMatchedResults] = useState<ParsedLine[]>([]);
   const [showMatchModal, setShowMatchModal] = useState(false);
 
-  // 加载最新价格数据用于匹配
+  // 加载正式库数据
   useEffect(() => {
     const loadPrices = async () => {
       try {
         const res = await fetchLatestPrices();
-        setPriceData(res.data || []);
+        setOfficialData((res.data || []).map(item => ({ ...item, source: 'official' as const })));
       } catch (error) {
-        console.error('加载价格数据失败:', error);
+        console.error('加载正式库数据失败:', error);
       }
     };
     loadPrices();
   }, []);
+
+  // 加载临时表数据
+  useEffect(() => {
+    const loadTempQuotes = async () => {
+      try {
+        const res = await fetchTempQuotes();
+        setTempData((res.data || []).map(item => ({ ...item, source: 'temp' as const })));
+      } catch (error) {
+        console.error('加载临时表数据失败:', error);
+      }
+    };
+    loadTempQuotes();
+  }, []);
+
+  // 合并数据源
+  const allData = [...officialData, ...tempData];
 
   // 根据银行名称和期限匹配价格数据
   const matchPriceData = (bankName: string, tenor: string): PriceData[] => {
@@ -61,7 +79,7 @@ export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
     const targetTenors = tenorMap[tenor] || [tenor];
 
     // 找出所有匹配的项，返回多个供用户选择
-    return priceData.filter(item => {
+    return allData.filter(item => {
       // 银行名称匹配
       const bankMatch = item.bank_name.includes(bankName) ||
                         item.issue_name.includes(bankName) ||
