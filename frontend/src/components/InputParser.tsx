@@ -113,6 +113,30 @@ export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
     setShowMatchModal(true);
   };
 
+  // 关闭匹配弹窗时，使用最新的 matchedResults（包含用户选择的数据）
+  const handleCloseMatchModal = () => {
+    // 将 matchedResults 中的确认选择应用回 parsedResults
+    const updated = matchedResults.map((result) => ({
+      bankName: result.bankName,
+      tenor: result.tenor,
+      yield: result.yield,
+      volume: result.volume,
+      weekday: result.weekday,
+      rating: result.rating,
+      raw: result.raw,
+      matched: result.matched,
+      issues: result.issues,
+      issueCode: result.issueCode,
+      issueName: result.issueName,
+      issueDate: result.issueDate,
+      price: result.price,
+      refYield: result.refYield
+    }));
+    setParsedResults(updated);
+    onParsed(updated);
+    setShowMatchModal(false);
+  };
+
   const handleClear = () => {
     setInputText('');
     setParsedResults([]);
@@ -328,10 +352,7 @@ export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
             {/* 底部按钮 */}
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-3">
               <button
-                onClick={() => {
-                  setShowMatchModal(false);
-                  onParsed(parsedResults);
-                }}
+                onClick={handleCloseMatchModal}
                 className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700"
               >
                 确认并关闭

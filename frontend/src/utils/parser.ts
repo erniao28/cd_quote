@@ -234,6 +234,14 @@ export interface ParsedLine {
   raw: string;
   matched: boolean;
   issues: string[];  // 解析问题列表
+  // 匹配到的完整数据字段（用于输出标准格式）
+  issueCode?: string;
+  issueName?: string;
+  issueDate?: string;
+  price?: string;
+  refYield?: string;
+  // 内部字段（匹配弹窗使用）
+  _matches?: any[];
 }
 
 export function parseLine(input: string): ParsedLine {
