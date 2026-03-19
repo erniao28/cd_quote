@@ -374,9 +374,25 @@ export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-3">
               <button
                 onClick={() => {
-                  // 直接使用 parsedResults（已经同步更新）
-                  setParsedResults(parsedResults);
-                  onParsed(parsedResults);
+                  // 从 matchedResults 构建最终数据（包含用户选择的所有数据）
+                  const finalResults = matchedResults.map(result => ({
+                    bankName: result.bankName,
+                    tenor: result.tenor,
+                    yield: result.yield,
+                    volume: result.volume,
+                    weekday: result.weekday,
+                    rating: result.rating,
+                    raw: result.raw,
+                    matched: result.matched,
+                    issues: result.issues,
+                    issueCode: result.issueCode,
+                    issueName: result.issueName,
+                    issueDate: result.issueDate,
+                    price: result.price,
+                    refYield: result.refYield
+                  }));
+                  setParsedResults(finalResults);
+                  onParsed(finalResults);
                   setShowMatchModal(false);
                 }}
                 className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700"
