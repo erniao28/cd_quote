@@ -33,6 +33,7 @@ const App: React.FC = () => {
   // 在线编辑相关
   const [showTempEditor, setShowTempEditor] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'info' | 'error'; text: string }>({ type: 'info', text: '' });
 
   // 初始化加载数据
   useEffect(() => {
@@ -123,23 +124,41 @@ const App: React.FC = () => {
     }
 
     try {
-      // 先获取正式数据
+      // 先检查临时表是否已有数据
+      const tempRes = await fetchTempQuotes();
+      const existingTemp = tempRes.data || [];
+
+      if (existingTemp.length > 0) {
+        // 临时表已有数据，直接打开编辑器
+        setShowTempEditor(true);
+        return;
+      }
+
+      // 临时表为空，尝试从正式库获取数据
+      setMessage({ type: 'info', text: '正在加载数据...' });
+
       const res = await fetchPrices(targetDate);
       const prices = res.data || [];
 
       if (prices.length === 0) {
-        if (!confirm('当前日期没有正式数据，是否打开空编辑器手动添加？')) {
-          return;
+        // 正式库也没有数据，询问用户
+        if (confirm(`当前日期（${targetDate}）没有数据。是否打开空编辑器手动添加？`)) {
+          setShowTempEditor(true);
         }
-        setShowTempEditor(true);
+        setMessage({ type: 'info', text: '' });
         return;
       }
 
       // 保存到临时表
       await saveTempQuotes(prices);
+      setMessage({ type: 'success', text: `已加载 ${prices.length} 条数据到临时表` });
       setShowTempEditor(true);
     } catch (error: any) {
-      alert(`导入失败：${error.message}`);
+      console.error('打开编辑器失败:', error);
+      // 出错时打开空编辑器
+      if (confirm(`加载数据失败：${error.message}。是否打开空编辑器手动添加？`)) {
+        setShowTempEditor(true);
+      }
     }
   };
 

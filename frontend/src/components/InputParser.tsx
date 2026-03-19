@@ -113,6 +113,43 @@ export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
     setShowMatchModal(true);
   };
 
+  // 处理单条匹配确认
+  const handleMatchConfirm = (index: number, matchedData: PriceData) => {
+    // 更新 matchedResults 中的对应项
+    const updatedMatched = [...matchedResults];
+    updatedMatched[index] = {
+      ...updatedMatched[index],
+      issueCode: matchedData.issue_code,
+      issueName: matchedData.issue_name,
+      issueDate: matchedData.issue_date || issueDate,
+      price: matchedData.price,
+      refYield: matchedData.ref_yield,
+      volume: matchedData.volume,
+      rating: matchedData.rating,
+      tenor: matchedData.tenor,
+      matched: true,
+      _selectedMatch: matchedData  // 标记已选择
+    };
+    setMatchedResults(updatedMatched);
+
+    // 同时更新 parsedResults（保持同步）
+    const updatedParsed = [...parsedResults];
+    updatedParsed[index] = {
+      ...updatedParsed[index],
+      issueCode: matchedData.issue_code,
+      issueName: matchedData.issue_name,
+      issueDate: matchedData.issue_date || issueDate,
+      price: matchedData.price,
+      refYield: matchedData.ref_yield,
+      volume: matchedData.volume,
+      rating: matchedData.rating,
+      tenor: matchedData.tenor,
+      matched: true
+    };
+    setParsedResults(updatedParsed);
+    onParsed(updatedParsed);
+  };
+
   // 关闭匹配弹窗时，使用最新的 matchedResults（包含用户选择的数据）
   const handleCloseMatchModal = () => {
     // 将 matchedResults 中的确认选择应用回 parsedResults
@@ -327,24 +364,8 @@ export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
                   parsedItem={result}
                   matches={result._matches || []}
                   issueDate={issueDate}
-                  onConfirm={(matchedData) => {
-                    // 确认匹配后，更新 parsedResults
-                    const updated = [...parsedResults];
-                    updated[idx] = {
-                      ...updated[idx],
-                      issueCode: matchedData.issue_code,
-                      issueName: matchedData.issue_name,
-                      issueDate: matchedData.issue_date || issueDate,
-                      price: matchedData.price,
-                      refYield: matchedData.ref_yield,
-                      volume: matchedData.volume,
-                      rating: matchedData.rating,
-                      tenor: matchedData.tenor,
-                      matched: true
-                    };
-                    setParsedResults(updated);
-                    onParsed(updated);
-                  }}
+                  hasSelected={!!result._selectedMatch}
+                  onConfirm={(matchedData) => handleMatchConfirm(idx, matchedData)}
                 />
               ))}
             </div>
@@ -352,7 +373,12 @@ export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
             {/* 底部按钮 */}
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-3">
               <button
-                onClick={handleCloseMatchModal}
+                onClick={() => {
+                  // 直接使用 parsedResults（已经同步更新）
+                  setParsedResults(parsedResults);
+                  onParsed(parsedResults);
+                  setShowMatchModal(false);
+                }}
                 className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700"
               >
                 确认并关闭
@@ -370,14 +396,15 @@ const MatchItem: React.FC<{
   parsedItem: ParsedLine & { _matches?: PriceData[] };
   matches: PriceData[];
   issueDate?: string;
+  hasSelected?: boolean;
   onConfirm: (data: PriceData) => void;
-}> = ({ parsedItem, matches, issueDate, onConfirm }) => {
+}> = ({ parsedItem, matches, issueDate, hasSelected, onConfirm }) => {
   const [selectedMatch, setSelectedMatch] = useState<PriceData | null>(
     matches[0] || null
   );
 
   return (
-    <div className="mb-6 p-4 bg-slate-50 rounded-xl border border-slate-200">
+    <div className={`mb-6 p-4 rounded-xl border ${hasSelected ? 'bg-emerald-50 border-emerald-300' : 'bg-slate-50 border-slate-200'}`}>
       {/* 解析结果 */}
       <div className="mb-3">
         <div className="text-xs font-bold text-slate-500 mb-2">解析结果</div>
@@ -403,6 +430,9 @@ const MatchItem: React.FC<{
               {parsedItem.volume}
             </span>
           )}
+          {hasSelected && (
+            <span className="text-xs font-bold text-emerald-600 ml-2">✓ 已选择</span>
+          )}
         </div>
       </div>
 
@@ -422,13 +452,14 @@ const MatchItem: React.FC<{
                   selectedMatch?.issue_code === match.issue_code
                     ? 'bg-indigo-50 border-indigo-300'
                     : 'bg-white border-slate-200 hover:bg-slate-50'
-                }`}
+                } ${hasSelected ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <input
                   type="radio"
                   name={`match_${parsedItem.bankName}_${idx}`}
                   checked={selectedMatch?.issue_code === match.issue_code}
-                  onChange={() => setSelectedMatch(match)}
+                  onChange={() => !hasSelected && setSelectedMatch(match)}
+                  disabled={hasSelected}
                   className="w-4 h-4 text-indigo-600"
                 />
                 <div className="flex-1 flex flex-wrap gap-3 text-sm">
@@ -445,13 +476,18 @@ const MatchItem: React.FC<{
       </div>
 
       {/* 确认按钮 */}
-      {selectedMatch && (
+      {selectedMatch && !hasSelected && (
         <button
           onClick={() => onConfirm(selectedMatch)}
           className="mt-3 w-full py-2 bg-emerald-500 text-white rounded-xl font-bold text-sm hover:bg-emerald-600 transition"
         >
           确认选择：{selectedMatch.issue_code} {selectedMatch.issue_name}
         </button>
+      )}
+      {hasSelected && (
+        <div className="mt-3 w-full py-2 bg-emerald-100 text-emerald-700 rounded-xl font-bold text-sm text-center">
+          ✓ 已确认
+        </div>
       )}
     </div>
   );

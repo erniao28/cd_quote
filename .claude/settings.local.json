@@ -5,7 +5,9 @@
       "Bash(npm start:*)",
       "Bash(npm run:*)",
       "Bash(git add:*)",
-      "Bash(wait:*)"
+      "Bash(wait:*)",
+      "Bash(ssh auto-quote-server:*)",
+      "Bash(scp:*)"
     ]
   }
 }
