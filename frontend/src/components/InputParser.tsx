@@ -29,6 +29,12 @@ export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
   const [matchedResults, setMatchedResults] = useState<ParsedLine[]>([]);
   const [showMatchModal, setShowMatchModal] = useState(false);
 
+  // 使用 ref 存储 matchedResults 的最新值，避免闭包问题
+  const matchedResultsRef = React.useRef<ParsedLine[]>([]);
+  React.useEffect(() => {
+    matchedResultsRef.current = matchedResults;
+  }, [matchedResults]);
+
   // 加载正式库数据
   useEffect(() => {
     const loadPrices = async () => {
@@ -115,32 +121,28 @@ export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
 
   // 处理单条匹配确认
   const handleMatchConfirm = (index: number, matchedData: PriceData) => {
-    // 只更新 matchedResults，不直接更新 parsedResults
-    const updatedMatched = [...matchedResults];
-    updatedMatched[index] = {
-      ...updatedMatched[index],
-      issueCode: matchedData.issue_code,
-      issueName: matchedData.issue_name,
-      issueDate: matchedData.issue_date || issueDate,
-      price: matchedData.price,
-      refYield: matchedData.ref_yield,
-      volume: matchedData.volume,
-      rating: matchedData.rating,
-      tenor: matchedData.tenor,
-      matched: true,
-      _selectedMatch: matchedData  // 标记已选择
-    };
-    setMatchedResults(updatedMatched);
+    setMatchedResults(prev => {
+      const updatedMatched = [...prev];
+      updatedMatched[index] = {
+        ...updatedMatched[index],
+        issueCode: matchedData.issue_code,
+        issueName: matchedData.issue_name,
+        issueDate: matchedData.issue_date || issueDate,
+        price: matchedData.price,
+        refYield: matchedData.ref_yield,
+        volume: matchedData.volume,
+        rating: matchedData.rating,
+        tenor: matchedData.tenor,
+        matched: true,
+        _selectedMatch: matchedData
+      };
+      return updatedMatched;
+    });
   };
 
-  // 关闭匹配弹窗（放弃所有更改）
-  const handleCloseMatchModal = () => {
-    setShowMatchModal(false);
-  };
-
-  // 应用匹配结果
+  // 应用匹配结果 - 使用 ref 读取最新的 matchedResults
   const applyMatchedResults = () => {
-    const updated = matchedResults.map((result) => ({
+    const updated = matchedResultsRef.current.map((result) => ({
       bankName: result.bankName,
       tenor: result.tenor,
       yield: result.yield,
@@ -158,6 +160,7 @@ export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
     }));
     setParsedResults(updated);
     onParsed(updated);
+    setShowMatchModal(false);
   };
 
   const handleClear = () => {

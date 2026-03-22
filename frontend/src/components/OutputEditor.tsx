@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ParsedLine } from '../utils/parser';
 
 interface Props {
@@ -7,12 +7,26 @@ interface Props {
 }
 
 export const OutputEditor: React.FC<Props> = ({ items, issueDate }) => {
-  const [order, setOrder] = useState<number[]>(items.map((_, i) => i));
+  const [order, setOrder] = useState<number[]>([]);
   const [selected, setSelected] = useState<number[]>([]);
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [outputFormat, setOutputFormat] = useState<'default' | 'compact'>('default');
-  const [settlementOffset, setSettlementOffset] = useState(2);  // 默认 T+2
+  const [settlementOffset, setSettlementOffset] = useState(3);  // 默认 T+3 工作日
   const [customSettlementDate, setCustomSettlementDate] = useState('');
+
+  // 使用 ref 追踪最新的 items
+  const itemsRef = useRef<ParsedLine[]>(items);
+  itemsRef.current = items;
+
+  // 当 items 变化时，只在 order 为空或长度不匹配时更新
+  useEffect(() => {
+    setOrder(prev => {
+      if (prev.length === 0 || prev.length !== items.length) {
+        return items.map((_, i) => i);
+      }
+      return prev;
+    });
+  }, [items]);
 
   // 计算交割日期（发行日期 + 偏移天数）
   const calculateSettlementDate = (dateStr: string, offset: number = settlementOffset) => {
@@ -69,8 +83,8 @@ export const OutputEditor: React.FC<Props> = ({ items, issueDate }) => {
 
       // 如果匹配到了完整数据，输出标准化格式
       if (item.issueCode && item.issueName && item.price) {
-        // 标准化格式：代码 简称 期限 收益率 价格 交割日期
-        return `${item.issueCode} ${item.issueName} ${item.tenor} ${item.yield || item.rating || ''} ${item.price} ${settlementDate}+${settlementOffset}`;
+        // 标准化格式：代码 代码简称 期限 收益率 净价 交割日期
+        return `${item.issueCode} ${item.issueName} ${item.tenor} ${item.yield || ''} ${item.price} ${settlementDate}`;
       }
 
       // 原始格式
@@ -85,7 +99,20 @@ export const OutputEditor: React.FC<Props> = ({ items, issueDate }) => {
       return parts;
     }).join('\n');
 
-    navigator.clipboard.writeText(output);
+    // 降级方案：navigator.clipboard 在非 HTTPS 环境可能不可用
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(output);
+    } else {
+      // 传统复制方法
+      const textarea = document.createElement('textarea');
+      textarea.value = output;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    }
     setCopyFeedback(true);
     setTimeout(() => setCopyFeedback(false), 2000);
   };

@@ -13,7 +13,10 @@
       "Bash(node:*)",
       "Bash(ls -la E:/file/project_ai/cc_test/cd_quote/*.md)",
       "Bash(git commit:*)",
-      "Bash(ssh:*)"
+      "Bash(ssh:*)",
+      "Bash(git remote:*)",
+      "Bash(grep -o \"applyMatchedResults\" frontend/dist/assets/*.js)",
+      "Bash(grep -o \"issueCode.*issueName.*price\" frontend/dist/assets/*.js)"
     ]
   }
 }
