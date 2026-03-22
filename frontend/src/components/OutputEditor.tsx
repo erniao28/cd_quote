@@ -96,7 +96,6 @@ export const OutputEditor: React.FC<Props> = ({ items, issueDate }) => {
       return order.indexOf(a) - order.indexOf(b);
     });
 
-    console.log('选中项编号:', sortedSelected.map((i, idx) => `${items[i].bankName}: ${idx + 1}`));
     alert(`已选中 ${sortedSelected.length} 项，编号 1-${sortedSelected.length}`);
   };
 
