@@ -9,7 +9,11 @@
       "Bash(ssh auto-quote-server:*)",
       "Bash(scp:*)",
       "Bash(git push:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(node:*)",
+      "Bash(ls -la E:/file/project_ai/cc_test/cd_quote/*.md)",
+      "Bash(git commit:*)",
+      "Bash(ssh:*)"
     ]
   }
 }

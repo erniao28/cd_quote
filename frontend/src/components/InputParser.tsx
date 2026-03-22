@@ -115,7 +115,7 @@ export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
 
   // 处理单条匹配确认
   const handleMatchConfirm = (index: number, matchedData: PriceData) => {
-    // 更新 matchedResults 中的对应项
+    // 只更新 matchedResults，不直接更新 parsedResults
     const updatedMatched = [...matchedResults];
     updatedMatched[index] = {
       ...updatedMatched[index],
@@ -131,28 +131,15 @@ export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
       _selectedMatch: matchedData  // 标记已选择
     };
     setMatchedResults(updatedMatched);
-
-    // 同时更新 parsedResults（保持同步）
-    const updatedParsed = [...parsedResults];
-    updatedParsed[index] = {
-      ...updatedParsed[index],
-      issueCode: matchedData.issue_code,
-      issueName: matchedData.issue_name,
-      issueDate: matchedData.issue_date || issueDate,
-      price: matchedData.price,
-      refYield: matchedData.ref_yield,
-      volume: matchedData.volume,
-      rating: matchedData.rating,
-      tenor: matchedData.tenor,
-      matched: true
-    };
-    setParsedResults(updatedParsed);
-    onParsed(updatedParsed);
   };
 
-  // 关闭匹配弹窗时，使用最新的 matchedResults（包含用户选择的数据）
+  // 关闭匹配弹窗（放弃所有更改）
   const handleCloseMatchModal = () => {
-    // 将 matchedResults 中的确认选择应用回 parsedResults
+    setShowMatchModal(false);
+  };
+
+  // 应用匹配结果
+  const applyMatchedResults = () => {
     const updated = matchedResults.map((result) => ({
       bankName: result.bankName,
       tenor: result.tenor,
@@ -171,7 +158,6 @@ export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
     }));
     setParsedResults(updated);
     onParsed(updated);
-    setShowMatchModal(false);
   };
 
   const handleClear = () => {
@@ -347,8 +333,12 @@ export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
                 </p>
               </div>
               <button
-                onClick={() => setShowMatchModal(false)}
+                onClick={() => {
+                  applyMatchedResults();
+                  setShowMatchModal(false);
+                }}
                 className="p-2 hover:bg-slate-100 rounded-xl transition"
+                title="确认并关闭"
               >
                 <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -373,26 +363,14 @@ export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
             {/* 底部按钮 */}
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-3">
               <button
+                onClick={handleCloseMatchModal}
+                className="px-6 py-2 bg-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-300"
+              >
+                取消
+              </button>
+              <button
                 onClick={() => {
-                  // 从 matchedResults 构建最终数据（包含用户选择的所有数据）
-                  const finalResults = matchedResults.map(result => ({
-                    bankName: result.bankName,
-                    tenor: result.tenor,
-                    yield: result.yield,
-                    volume: result.volume,
-                    weekday: result.weekday,
-                    rating: result.rating,
-                    raw: result.raw,
-                    matched: result.matched,
-                    issues: result.issues,
-                    issueCode: result.issueCode,
-                    issueName: result.issueName,
-                    issueDate: result.issueDate,
-                    price: result.price,
-                    refYield: result.refYield
-                  }));
-                  setParsedResults(finalResults);
-                  onParsed(finalResults);
+                  applyMatchedResults();
                   setShowMatchModal(false);
                 }}
                 className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700"
