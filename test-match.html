@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>匹配功能测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-item { border: 1px solid #ccc; padding: 10px; margin: 10px 0; border-radius: 8px; }
+        .green { background-color: #d4edda; border-color: #28a745; }
+        .white { background-color: #fff; border-color: #ccc; }
+        button { padding: 8px 16px; margin: 5px; cursor: pointer; }
+        #result { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>匹配功能测试</h1>
+    <p>点击"模拟匹配"按钮，测试数据是否正确传递到输出编辑器</p>
+
+    <button onclick="testMatch()">模拟匹配</button>
+    <button onclick="clearTest()">清空</button>
+
+    <div id="result"></div>
+
+    <script>
+        // 模拟 ParsedLine 数据结构
+        let items = [];
+
+        function testMatch() {
+            // 模拟匹配后的数据
+            items = [
+                {
+                    bankName: '农业银行',
+                    rating: 'AAA',
+                    tenor: '1Y',
+                    yield: '1.62%',
+                    volume: '5e',
+                    weekday: '周一',
+                    raw: '农业银行 1y 5e',
+                    matched: true,
+                    issues: [],
+                    // 匹配到的完整数据
+                    issueCode: '24XXCD001',
+                    issueName: '农业银行存单 001',
+                    issueDate: '2026-03-22',
+                    price: '99.50',
+                    refYield: '1.62%'
+                }
+            ];
+
+            renderOutput();
+        }
+
+        function clearTest() {
+            items = [];
+            document.getElementById('result').innerHTML = '';
+        }
+
+        function renderOutput() {
+            const container = document.getElementById('result');
+            container.innerHTML = '<h2>输出编辑器</h2>';
+
+            items.forEach((item, index) => {
+                const hasFullData = item.issueCode && item.issueName && item.price;
+                const div = document.createElement('div');
+                div.className = 'test-item ' + (hasFullData ? 'green' : 'white');
+
+                if (hasFullData) {
+                    // 标准格式输出
+                    div.innerHTML = `
+                        <strong>✓ 匹配成功</strong><br>
+                        代码：${item.issueCode}<br>
+                        简称：${item.issueName}<br>
+                        期限：${item.tenor}<br>
+                        收益率：${item.yield}<br>
+                        净价：${item.price}<br>
+                        交割：2026-03-25
+                    `;
+                } else {
+                    // 原始格式输出
+                    div.innerHTML = `
+                        <strong>未匹配完整数据</strong><br>
+                        ${item.bankName} -- ${item.rating} ${item.tenor} ${item.yield} ${item.volume || ''}
+                    `;
+                }
+
+                container.appendChild(div);
+            });
+
+            // 显示原始数据
+            const debugDiv = document.createElement('div');
+            debugDiv.style.marginTop = '20px';
+            debugDiv.style.background = '#f5f5f5';
+            debugDiv.style.padding = '10px';
+            debugDiv.innerHTML = '<h3>原始数据 (JSON)</h3><pre>' + JSON.stringify(items[0], null, 2) + '</pre>';
+            container.appendChild(debugDiv);
+        }
+
+        // 自动运行测试
+        testMatch();
+    </script>
+</body>
+</html>

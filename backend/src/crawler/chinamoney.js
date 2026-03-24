@@ -201,21 +201,55 @@ export async function parseExcelFile(buffer) {
   await workbook.xlsx.load(buffer);
   const worksheet = workbook.getWorksheet(1);
 
+  // 读取表头，建立列名到列索引的映射
+  const headerRow = worksheet.getRow(1);
+  const columnMap = {};
+  headerRow.eachCell((cell, colNumber) => {
+    const headerName = cell.text.trim();
+    // 映射常见表头名称
+    if (headerName.includes('代码') || headerName.includes('存单代码')) {
+      columnMap.issue_code = colNumber;
+    } else if (headerName.includes('简称') || headerName.includes('存单简称')) {
+      columnMap.issue_name = colNumber;
+    } else if (headerName.includes('发行日期') || headerName.includes('日期')) {
+      columnMap.issue_date = colNumber;
+    } else if (headerName.includes('期限') || headerName.includes('月') || headerName.includes('年')) {
+      columnMap.tenor = colNumber;
+    } else if (headerName.includes('收益率') || headerName.includes('参考收益率')) {
+      columnMap.ref_yield = colNumber;
+    } else if (headerName.includes('量') || headerName.includes('发行量') || headerName.includes('计划')) {
+      columnMap.volume = colNumber;
+    } else if (headerName.includes('评级') || headerName.includes('主体评级')) {
+      columnMap.rating = colNumber;
+    } else if (headerName.includes('价格') || headerName.includes('发行价格') || headerName.includes('净价')) {
+      columnMap.price = colNumber;
+    } else if (headerName.includes('银行') || headerName.includes('银行名称')) {
+      columnMap.bank_name = colNumber;
+    }
+  });
+
+  console.log('[Excel 导入] 列映射:', columnMap);
+
   const prices = [];
   worksheet.eachRow((row, rowNumber) => {
     if (rowNumber === 1) return; // 跳过表头
 
+    const getText = (fieldName) => {
+      const colNum = columnMap[fieldName];
+      return colNum ? row.getCell(colNum).text : '';
+    };
+
     const price = {
       id: `price_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      issue_code: row.getCell(1).text,
-      issue_name: row.getCell(2).text,
-      issue_date: row.getCell(3).text,
-      tenor: row.getCell(4).text,
-      ref_yield: row.getCell(5).text,
-      volume: row.getCell(6).text,
-      rating: row.getCell(7).text,
-      price: '',  // Excel 中没有发行价格
-      bank_name: extractBankName(row.getCell(2).text),
+      issue_code: getText('issue_code'),
+      issue_name: getText('issue_name'),
+      issue_date: getText('issue_date'),
+      tenor: getText('tenor'),
+      ref_yield: getText('ref_yield'),
+      volume: getText('volume'),
+      rating: getText('rating'),
+      price: getText('price') || '',  // Excel 中可能没有发行价格
+      bank_name: getText('bank_name') || extractBankName(getText('issue_name')),
       created_at: Date.now(),
       updated_at: Date.now()
     };

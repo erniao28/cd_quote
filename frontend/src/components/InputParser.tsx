@@ -29,11 +29,11 @@ export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
   const [matchedResults, setMatchedResults] = useState<ParsedLine[]>([]);
   const [showMatchModal, setShowMatchModal] = useState(false);
 
-  // 使用 ref 存储 matchedResults 的最新值，避免闭包问题
-  const matchedResultsRef = React.useRef<ParsedLine[]>([]);
+  // 使用 ref 确保 onParsed 始终是最新的
+  const onParsedRef = React.useRef(onParsed);
   React.useEffect(() => {
-    matchedResultsRef.current = matchedResults;
-  }, [matchedResults]);
+    onParsedRef.current = onParsed;
+  }, [onParsed]);
 
   // 加载正式库数据
   useEffect(() => {
@@ -121,10 +121,28 @@ export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
 
   // 处理单条匹配确认
   const handleMatchConfirm = (index: number, matchedData: PriceData) => {
-    setMatchedResults(prev => {
-      const updatedMatched = [...prev];
-      updatedMatched[index] = {
-        ...updatedMatched[index],
+    // 更新 matchedResults
+    const updatedMatched = [...matchedResults];
+    updatedMatched[index] = {
+      ...updatedMatched[index],
+      issueCode: matchedData.issue_code,
+      issueName: matchedData.issue_name,
+      issueDate: matchedData.issue_date || issueDate,
+      price: matchedData.price,
+      refYield: matchedData.ref_yield,
+      volume: matchedData.volume,
+      rating: matchedData.rating,
+      // 不覆盖 tenor，保留用户输入的原始期限
+      matched: true,
+      _selectedMatch: matchedData
+    };
+    setMatchedResults(updatedMatched);
+
+    // 同步更新 parsedResults，让 OutputEditor 实时显示
+    setParsedResults(prev => {
+      const updatedParsed = [...prev];
+      updatedParsed[index] = {
+        ...updatedParsed[index],
         issueCode: matchedData.issue_code,
         issueName: matchedData.issue_name,
         issueDate: matchedData.issue_date || issueDate,
@@ -132,34 +150,22 @@ export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
         refYield: matchedData.ref_yield,
         volume: matchedData.volume,
         rating: matchedData.rating,
-        tenor: matchedData.tenor,
-        matched: true,
-        _selectedMatch: matchedData
+        // 不覆盖 tenor，保留用户输入的原始期限
+        matched: true
       };
-      return updatedMatched;
+      // 使用 ref 中的 onParsed，确保始终是最新的
+      onParsedRef.current(updatedParsed);
+      return updatedParsed;
     });
   };
 
-  // 应用匹配结果 - 使用 ref 读取最新的 matchedResults
+  // 关闭匹配弹窗
+  const handleCloseMatchModal = () => {
+    setShowMatchModal(false);
+  };
+
+  // 应用匹配结果（关闭时使用）
   const applyMatchedResults = () => {
-    const updated = matchedResultsRef.current.map((result) => ({
-      bankName: result.bankName,
-      tenor: result.tenor,
-      yield: result.yield,
-      volume: result.volume,
-      weekday: result.weekday,
-      rating: result.rating,
-      raw: result.raw,
-      matched: result.matched,
-      issues: result.issues,
-      issueCode: result.issueCode,
-      issueName: result.issueName,
-      issueDate: result.issueDate,
-      price: result.price,
-      refYield: result.refYield
-    }));
-    setParsedResults(updated);
-    onParsed(updated);
     setShowMatchModal(false);
   };
 

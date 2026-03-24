@@ -79,12 +79,20 @@ export const OutputEditor: React.FC<Props> = ({ items, issueDate }) => {
   const handleCopy = () => {
     const output = order.map((idx) => {
       const item = items[idx];
-      const settlementDate = calculateSettlementDate(item.issueDate || issueDate);
+      // 使用 issueDate 计算交割日期（发行日期 + T+2，默认）
+      const issueDateStr = item.issueDate || issueDate;
+      const dateObj = new Date(issueDateStr);
+      // T+2：发行日 + 2 天
+      dateObj.setDate(dateObj.getDate() + 2);
+      // 格式化为 月/日+0
+      const settlementStr = `${dateObj.getMonth() + 1}/${dateObj.getDate()}+0`;
 
-      // 如果匹配到了完整数据，输出标准化格式
-      if (item.issueCode && item.issueName && item.price) {
+      // 如果匹配到了完整数据（有代码和简称），输出标准化格式
+      if (item.issueCode && item.issueName) {
         // 标准化格式：代码 代码简称 期限 收益率 净价 交割日期
-        return `${item.issueCode} ${item.issueName} ${item.tenor} ${item.yield || ''} ${item.price} ${settlementDate}`;
+        // yield 是用户输入的收益率，refYield 是参考收益率（可能为空或期限）
+        // price 是净价（数据库中可能为空）
+        return `${item.issueCode} ${item.issueName} ${item.tenor} ${item.yield || item.refYield || '-'} ${item.price || '-'} ${settlementStr}`;
       }
 
       // 原始格式
@@ -245,8 +253,8 @@ export const OutputEditor: React.FC<Props> = ({ items, issueDate }) => {
           const isSelected = selected.includes(originalIndex);
           const settlementDate = calculateSettlementDate(item.issueDate || issueDate);
 
-          // 是否匹配到完整数据
-          const hasFullData = item.issueCode && item.issueName && item.price;
+          // 是否匹配到完整数据 - 只要 issueCode 和 issueName 有值即可
+          const hasFullData = item.issueCode && item.issueName;
 
           return (
             <div
@@ -271,14 +279,14 @@ export const OutputEditor: React.FC<Props> = ({ items, issueDate }) => {
               {/* 内容 */}
               <div className="flex-1 font-mono text-sm">
                 {hasFullData ? (
-                  // 匹配到完整数据的显示
+                  // 匹配到完整数据的显示 - 输出格式：代码 代码简称 期限 收益率 净价 交割日期
                   <div className="flex flex-wrap gap-3 items-center">
                     <span className="font-bold text-emerald-600">✓</span>
                     <span className="font-bold text-slate-800">{item.issueCode}</span>
                     <span className="text-slate-700">{item.issueName}</span>
                     <span className="text-indigo-600 font-bold">{item.tenor}</span>
-                    <span className="text-emerald-600 font-bold">{item.yield || item.price}</span>
-                    <span className="text-slate-500">{item.price}</span>
+                    <span className="text-emerald-600 font-bold">{item.refYield || item.yield || '-'}</span>
+                    <span className="text-slate-500">{item.price || '-'}</span>
                     <span className="text-xs text-slate-400">交割：{settlementDate}</span>
                   </div>
                 ) : (

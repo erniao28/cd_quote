@@ -16,7 +16,8 @@
       "Bash(ssh:*)",
       "Bash(git remote:*)",
       "Bash(grep -o \"applyMatchedResults\" frontend/dist/assets/*.js)",
-      "Bash(grep -o \"issueCode.*issueName.*price\" frontend/dist/assets/*.js)"
+      "Bash(grep -o \"issueCode.*issueName.*price\" frontend/dist/assets/*.js)",
+      "Bash(cat frontend/dist/assets/index-*.js)"
     ]
   }
 }
