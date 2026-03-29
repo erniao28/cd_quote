@@ -22,18 +22,29 @@ export const TempQuoteManager: React.FC<Props> = ({ onQuoteDeleted }) => {
   const [quotes, setQuotes] = useState<TempQuote[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchField, setSearchField] = useState<'bank_name' | 'issue_code' | 'issue_name'>('bank_name');
+  const [searchField, setSearchField] = useState<'bank_name' | 'issue_code' | 'issue_name' | 'issue_date'>('bank_name');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showConfirm, setShowConfirm] = useState(false);
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 获取最新发行日期（用于筛选）
+  const latestIssueDate = quotes.length > 0
+    ? quotes[0].issue_date
+    : '';
 
   // 加载临时报价
   const loadQuotes = async () => {
     setLoading(true);
     try {
       const res = await fetchTempQuotes();
-      setQuotes(res.data || []);
+      // 按发行日期排序，最新的在前
+      const sorted = (res.data || []).sort((a, b) => {
+        if (!a.issue_date) return 1;
+        if (!b.issue_date) return -1;
+        return b.issue_date.localeCompare(a.issue_date);
+      });
+      setQuotes(sorted);
     } catch (error) {
       console.error('加载临时报价失败:', error);
     } finally {
@@ -43,6 +54,14 @@ export const TempQuoteManager: React.FC<Props> = ({ onQuoteDeleted }) => {
 
   useEffect(() => {
     loadQuotes();
+
+    // 监听刷新事件
+    const handleRefresh = () => loadQuotes();
+    window.addEventListener('refresh-temp-quotes', handleRefresh);
+
+    return () => {
+      window.removeEventListener('refresh-temp-quotes', handleRefresh);
+    };
   }, []);
 
   // 搜索过滤
@@ -209,7 +228,7 @@ export const TempQuoteManager: React.FC<Props> = ({ onQuoteDeleted }) => {
       </div>
 
       {/* 搜索栏 */}
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-4 flex-wrap items-center">
         <select
           value={searchField}
           onChange={(e) => setSearchField(e.target.value as any)}
@@ -218,13 +237,14 @@ export const TempQuoteManager: React.FC<Props> = ({ onQuoteDeleted }) => {
           <option value="bank_name">银行名称</option>
           <option value="issue_code">存单代码</option>
           <option value="issue_name">存单简称</option>
+          <option value="issue_date">发行日期</option>
         </select>
         <input
           type="text"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           placeholder="搜索..."
-          className="flex-1 text-xs bg-slate-50 border border-slate-200 px-4 py-2 rounded-xl outline-none focus:border-amber-200"
+          className="flex-1 min-w-[150px] text-xs bg-slate-50 border border-slate-200 px-4 py-2 rounded-xl outline-none focus:border-amber-200"
         />
         {searchTerm && (
           <button
@@ -235,6 +255,27 @@ export const TempQuoteManager: React.FC<Props> = ({ onQuoteDeleted }) => {
           </button>
         )}
       </div>
+
+      {/* 日期快速筛选 */}
+      {latestIssueDate && (
+        <div className="mb-4 p-3 bg-slate-50 rounded-xl border border-slate-200">
+          <div className="text-xs font-bold text-slate-500 mb-2">快速筛选发行日期：</div>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => { setSearchField('issue_date'); setSearchTerm(''); }}
+              className="px-3 py-1 text-xs bg-slate-200 text-slate-600 rounded-lg font-bold hover:bg-slate-300"
+            >
+              显示全部
+            </button>
+            <button
+              onClick={() => { setSearchField('issue_date'); setSearchTerm(latestIssueDate); }}
+              className="px-3 py-1 text-xs bg-emerald-500 text-white rounded-lg font-bold hover:bg-emerald-600"
+            >
+              最新：{latestIssueDate}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 批量操作栏 */}
       {selectedIds.size > 0 && (

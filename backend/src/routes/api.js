@@ -12,7 +12,7 @@ import {
   clearTempQuotes,
   confirmTempQuotes
 } from '../database.js';
-import { manualCrawl } from '../crawler/scheduler.js';
+import { manualCrawl, manualDownloadExcel } from '../crawler/scheduler.js';
 import { parseExcelFile, savePrices, extractBankName } from '../crawler/chinamoney.js';
 import { formatDate, getNextWorkday, isWorkday } from '../crawler/holiday.js';
 
@@ -57,6 +57,22 @@ router.post('/crawl', async (req, res) => {
   try {
     const { targetDate } = req.body;
     const result = await manualCrawl(targetDate);
+
+    if (result.success) {
+      res.json({ code: 200, data: result, message: 'success' });
+    } else {
+      res.status(500).json({ code: 500, message: result.message });
+    }
+  } catch (error) {
+    res.status(500).json({ code: 500, message: error.message });
+  }
+});
+
+// 手动下载 Excel
+router.post('/download-excel', async (req, res) => {
+  try {
+    const { targetDate } = req.body;
+    const result = await manualDownloadExcel(targetDate);
 
     if (result.success) {
       res.json({ code: 200, data: result, message: 'success' });

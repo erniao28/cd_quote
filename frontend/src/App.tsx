@@ -9,7 +9,8 @@ import {
   exportExcel,
   fetchTempQuotes,
   saveTempQuotes,
-  exportTempExcel
+  exportTempExcel,
+  triggerDownloadExcel
 } from './services/api';
 import { InputParser } from './components/InputParser';
 import { OutputEditor } from './components/OutputEditor';
@@ -25,6 +26,7 @@ const App: React.FC = () => {
     loading: false,
     message: ''
   });
+  const [activeAction, setActiveAction] = useState<'crawl' | 'download' | null>(null);
 
   // 输入解析相关
   const [parsedItems, setParsedItems] = useState<ParsedLine[]>([]);
@@ -71,49 +73,90 @@ const App: React.FC = () => {
     }
   };
 
+  // 爬取数据并保存到临时表
   const handleCrawl = async () => {
     if (!targetDate) {
       alert('请选择目标日期');
       return;
     }
 
+    setActiveAction('crawl');
     setCrawlStatus({ loading: true, message: '正在爬取...' });
 
     try {
       const res = await triggerCrawl(targetDate);
-      setCrawlStatus({
-        loading: false,
-        message: res.data.message || '爬取完成',
-        showDownload: false
-      });
+
+      if (res.data?.success) {
+        const count = res.data.count || 0;
+        const message = res.data.message || '';
+
+        // 无论是否有新数据，都刷新临时报价管理
+        window.dispatchEvent(new CustomEvent('refresh-temp-quotes'));
+
+        if (count > 0) {
+          setMessage({ type: 'success', text: `爬取成功！已获取 ${count} 条数据并保存到临时表，请在下方"临时报价管理"中查看` });
+        } else if (message.includes('已从正式库加载')) {
+          setMessage({ type: 'success', text: message });
+        } else {
+          setMessage({ type: 'info', text: message || '没有新数据' });
+        }
+        setCrawlStatus({ loading: false, message: '爬取完成' });
+      } else {
+        setCrawlStatus({ loading: false, message: '爬取失败，请尝试从货币网下载 Excel' });
+      }
       loadData();
       loadCrawlHistory();
     } catch (error: any) {
-      setCrawlStatus({
-        loading: false,
-        message: `爬取失败：${error.message}，请导入 Excel 文件或点击下载空模板`,
-        showDownload: true
-      });
+      setCrawlStatus({ loading: false, message: `爬取失败：${error.message}，请尝试从货币网下载 Excel` });
+    } finally {
+      setActiveAction(null);
     }
   };
 
-  const handleExport = async () => {
+  // 从货币网下载 Excel 并自动导入到临时表
+  const handleDownloadAndImport = async () => {
     if (!targetDate) {
-      alert('请先选择目标日期');
+      alert('请选择目标日期');
       return;
     }
 
+    setActiveAction('download');
+    setCrawlStatus({ loading: true, message: '正在下载 Excel...' });
+
     try {
-      const blob = await exportExcel(targetDate);
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `cd_quote_${targetDate}.xlsx`;
-      link.click();
-      window.URL.revokeObjectURL(url);
+      const res = await triggerDownloadExcel(targetDate);
+
+      if (res.data?.success) {
+        const count = res.data.count || 0;
+        const message = res.data.message || '';
+
+        // 无论是否有新数据，都刷新临时报价管理
+        window.dispatchEvent(new CustomEvent('refresh-temp-quotes'));
+
+        if (count > 0) {
+          setMessage({ type: 'success', text: `下载成功！已获取 ${count} 条数据并保存到临时表，请在下方"临时报价管理"中查看` });
+        } else if (message.includes('已从正式库加载') || message.includes('成功')) {
+          setMessage({ type: 'success', text: message });
+        } else {
+          setMessage({ type: 'info', text: message || '没有新数据' });
+        }
+        setCrawlStatus({ loading: false, message: '下载完成' });
+        loadData();
+      } else {
+        setCrawlStatus({ loading: false, message: `下载失败：${res.data?.message || '未知错误'}` });
+      }
     } catch (error: any) {
-      alert(`导出失败：${error.message}`);
+      setCrawlStatus({ loading: false, message: `下载失败：${error.message}` });
+    } finally {
+      setActiveAction(null);
     }
+  };
+
+  // 打开货币网下载页面（备用方案）
+  const handleOpenChinamoney = () => {
+    const chinamoneyUrl = 'https://www.chinamoney.com.cn/chinese/tycdfxxx/?issueStType=1';
+    window.open(chinamoneyUrl, '_blank');
+    setMessage({ type: 'info', text: '已在新的窗口打开货币网，请下载 Excel 后上传' });
   };
 
   // 导入临时表并打开编辑器
@@ -226,56 +269,130 @@ const App: React.FC = () => {
                 </p>
               </section>
 
-              {/* 爬取控制 */}
+              {/* 数据操作 */}
               <section className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
                 <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-indigo-500"></span> 2. 爬取数据
+                  <span className="w-2 h-2 rounded-full bg-indigo-500"></span> 2. 获取数据
                 </h2>
-                <button
-                  onClick={handleCrawl}
-                  disabled={crawlStatus.loading}
-                  className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold shadow-xl hover:bg-indigo-700 transition-all disabled:opacity-50"
-                >
-                  {crawlStatus.loading ? '爬取中...' : '开始爬取'}
-                </button>
-                {crawlStatus.message && (
-                  <p className={`text-xs mt-2 text-center ${crawlStatus.message.includes('失败') ? 'text-red-500' : 'text-emerald-500'}`}>
-                    {crawlStatus.message}
+
+                {/* 方案 1：自动爬取 */}
+                <div className="mb-4">
+                  <div className="text-xs font-bold text-slate-500 mb-2 flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px]">1</span>
+                    方案 A：自动爬取（推荐）
+                  </div>
+                  <button
+                    onClick={handleCrawl}
+                    disabled={activeAction === 'crawl' || !targetDate}
+                    className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold shadow-xl hover:bg-indigo-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    {activeAction === 'crawl' ? '爬取中...' : '从货币网自动爬取'}
+                  </button>
+                  <p className="text-xs text-slate-400 mt-2">
+                    直接从中国货币网爬取数据，自动保存到临时表，可立即用于报价解析
                   </p>
-                )}
-                {crawlStatus.showDownload && (
-                  <div className="flex gap-2 mt-3">
+                </div>
+
+                {/* 分隔线 */}
+                <div className="flex items-center gap-3 my-4">
+                  <div className="flex-1 h-px bg-slate-200"></div>
+                  <span className="text-xs text-slate-400 font-bold">或</span>
+                  <div className="flex-1 h-px bg-slate-200"></div>
+                </div>
+
+                {/* 方案 2：下载并导入 */}
+                <div className="mb-4">
+                  <div className="text-xs font-bold text-slate-500 mb-2 flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px]">2</span>
+                    方案 B：下载并导入（备选）
+                  </div>
+                  <button
+                    onClick={handleDownloadAndImport}
+                    disabled={activeAction === 'download' || !targetDate}
+                    className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-bold shadow-xl hover:bg-emerald-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    {activeAction === 'download' ? '下载中...' : '从货币网下载 Excel 并导入'}
+                  </button>
+                  <p className="text-xs text-slate-400 mt-2">
+                    当自动爬取失败时，从货币网下载 Excel 并自动导入到临时表
+                  </p>
+                </div>
+
+                {/* 分隔线 */}
+                <div className="flex items-center gap-3 my-4">
+                  <div className="flex-1 h-px bg-slate-200"></div>
+                  <span className="text-xs text-slate-400 font-bold">或</span>
+                  <div className="flex-1 h-px bg-slate-200"></div>
+                </div>
+
+                {/* 方案 3：手动上传 Excel（最后的选择） */}
+                <div className="mb-4">
+                  <div className="text-xs font-bold text-slate-500 mb-2 flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-amber-600 text-white flex items-center justify-center text-[10px]">3</span>
+                    方案 C：手动上传（最后的选择）
+                  </div>
+                  <div className="flex gap-2">
                     <button
-                      onClick={handleExport}
-                      className="flex-1 py-3 bg-emerald-500 text-white rounded-2xl font-bold text-sm hover:bg-emerald-600 transition-all flex items-center justify-center gap-2"
+                      onClick={handleOpenChinamoney}
+                      disabled={!targetDate}
+                      className="flex-1 py-3 bg-white border-2 border-emerald-500 text-emerald-600 rounded-xl font-bold text-sm hover:bg-emerald-50 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                       </svg>
-                      导出 Excel
+                      打开货币网
                     </button>
                     <button
                       onClick={() => setShowImportModal(true)}
-                      className="flex-1 py-3 bg-amber-500 text-white rounded-2xl font-bold text-sm hover:bg-amber-600 transition-all flex items-center justify-center gap-2"
+                      disabled={!targetDate}
+                      className="flex-1 py-3 bg-amber-500 text-white rounded-xl font-bold text-sm hover:bg-amber-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l4-4 4 4m-4-4v12" />
                       </svg>
-                      导入 Excel
+                      上传 Excel
                     </button>
                   </div>
-                )}
-                {/* 在线编辑按钮 - 始终显示 */}
+                  <p className="text-xs text-slate-400 mt-2">
+                    当以上方法都失败时，手动从货币网下载 Excel 后上传
+                  </p>
+                </div>
+
+                {/* 在线编辑按钮 */}
                 <button
                   onClick={handleOpenEditor}
                   disabled={!targetDate}
-                  className="w-full mt-3 py-3 bg-orange-500 text-white rounded-2xl font-bold text-sm hover:bg-orange-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full mt-2 py-3 bg-orange-500 text-white rounded-xl font-bold text-sm hover:bg-orange-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                   </svg>
-                  在线编辑
+                  在线编辑（临时表）
                 </button>
+
+                {/* 状态消息 */}
+                {crawlStatus.message && (
+                  <div className={`mt-3 p-3 rounded-xl text-sm font-bold ${
+                    crawlStatus.message.includes('失败') || crawlStatus.message.includes('错误')
+                      ? 'bg-red-50 text-red-600'
+                      : 'bg-emerald-50 text-emerald-600'
+                  }`}>
+                    {crawlStatus.message}
+                  </div>
+                )}
+                {message.text && (
+                  <div className={`mt-3 p-3 rounded-xl text-sm font-bold ${
+                    message.type === 'error' ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'
+                  }`}>
+                    {message.text}
+                  </div>
+                )}
               </section>
 
               {/* 爬取历史 */}

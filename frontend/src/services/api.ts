@@ -31,6 +31,16 @@ export async function triggerCrawl(targetDate?: string) {
   return res.json();
 }
 
+export async function triggerDownloadExcel(targetDate?: string) {
+  const res = await fetch(`${API_BASE}/download-excel`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ targetDate })
+  });
+  if (!res.ok) throw new Error('下载 Excel 失败');
+  return res.json();
+}
+
 export async function fetchCrawlHistory() {
   const res = await fetch(`${API_BASE}/crawl-history`);
   if (!res.ok) throw new Error('获取爬取历史失败');

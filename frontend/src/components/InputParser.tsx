@@ -107,20 +107,36 @@ export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
 
   // 打开匹配弹窗
   const handleMatch = () => {
+    if (!parsedResults || parsedResults.length === 0) {
+      alert('请先解析输入数据');
+      return;
+    }
+
     const results = parsedResults.map(item => {
       const matches = matchPriceData(item.bankName, item.tenor);
+      console.log('匹配数据:', item.bankName, item.tenor, '=>', matches.length, '条');
       return {
         ...item,
         _matches: matches,  // 附加匹配到的数据
         matched: matches.length > 0
       };
     });
+    console.log('匹配结果总数:', results.length);
     setMatchedResults(results);
     setShowMatchModal(true);
   };
 
   // 处理单条匹配确认
   const handleMatchConfirm = (index: number, matchedData: PriceData) => {
+    if (!matchedResults[index] || !parsedResults[index]) {
+      console.error('索引超出范围:', index, matchedResults.length, parsedResults.length);
+      return;
+    }
+
+    // 获取当前用户输入的 volume（保留用户输入的量）
+    const currentItem = parsedResults[index];
+    const userVolume = currentItem?.volume || '';
+
     // 更新 matchedResults
     const updatedMatched = [...matchedResults];
     updatedMatched[index] = {
@@ -130,7 +146,7 @@ export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
       issueDate: matchedData.issue_date || issueDate,
       price: matchedData.price,
       refYield: matchedData.ref_yield,
-      volume: matchedData.volume,
+      volume: userVolume,  // 保留用户输入的量
       rating: matchedData.rating,
       // 不覆盖 tenor，保留用户输入的原始期限
       matched: true,
@@ -148,7 +164,7 @@ export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
         issueDate: matchedData.issue_date || issueDate,
         price: matchedData.price,
         refYield: matchedData.ref_yield,
-        volume: matchedData.volume,
+        volume: userVolume,  // 保留用户输入的量
         rating: matchedData.rating,
         // 不覆盖 tenor，保留用户输入的原始期限
         matched: true

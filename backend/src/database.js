@@ -152,6 +152,14 @@ export function getPricesByDate(date) {
   return results;
 }
 
+// 删除指定日期的数据
+export function deletePricesByDate(date) {
+  const stmt = db.prepare('DELETE FROM daily_prices WHERE issue_date = ?');
+  stmt.run([date]);
+  stmt.free();
+  saveDatabase();
+}
+
 export function getLatestPrices() {
   const stmt = db.prepare(`
     SELECT * FROM daily_prices

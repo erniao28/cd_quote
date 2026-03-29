@@ -28,15 +28,38 @@ export const OutputEditor: React.FC<Props> = ({ items, issueDate }) => {
     });
   }, [items]);
 
-  // 计算交割日期（发行日期 + 偏移天数）
-  const calculateSettlementDate = (dateStr: string, offset: number = settlementOffset) => {
-    // 优先使用自定义日期
-    if (customSettlementDate) {
-      return customSettlementDate;
-    }
+  // 计算交割日期（发行日期 + T+2 工作日）
+  const calculateSettlementDate = (dateStr: string) => {
     const date = new Date(dateStr || issueDate);
-    date.setDate(date.getDate() + offset);
-    return date.toISOString().split('T')[0];
+    let daysAdded = 0;
+    while (daysAdded < 2) {
+      date.setDate(date.getDate() + 1);
+      const day = date.getDay();
+      if (day !== 0 && day !== 6) {
+        daysAdded++;
+      }
+    }
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${month}.${day}+0`;
+  };
+
+  // 格式化收益率：去掉末尾 0，保留至少 2 位小数，添加%
+  const formatYield = (yieldVal: string | undefined) => {
+    if (!yieldVal) return '-';
+    const num = parseFloat(yieldVal);
+    if (isNaN(num)) return yieldVal;
+    // 保留 4 位小数，去掉末尾 0，至少保留 2 位小数
+    let formatted = num.toFixed(4).replace(/0+$/, '');
+    if (formatted.includes('.')) {
+      const [intPart, decPart] = formatted.split('.');
+      if (decPart && decPart.length < 2) {
+        formatted = num.toFixed(2);
+      } else if (!decPart) {
+        formatted = intPart;
+      }
+    }
+    return `${formatted}%`;
   };
 
   // 批量设置交割日期偏移
@@ -79,20 +102,31 @@ export const OutputEditor: React.FC<Props> = ({ items, issueDate }) => {
   const handleCopy = () => {
     const output = order.map((idx) => {
       const item = items[idx];
-      // 使用 issueDate 计算交割日期（发行日期 + T+2，默认）
+      // 使用 issueDate 计算交割日期（发行日期 + T+2 工作日）
       const issueDateStr = item.issueDate || issueDate;
       const dateObj = new Date(issueDateStr);
-      // T+2：发行日 + 2 天
-      dateObj.setDate(dateObj.getDate() + 2);
-      // 格式化为 月/日+0
-      const settlementStr = `${dateObj.getMonth() + 1}/${dateObj.getDate()}+0`;
+      // T+2：发行日 + 2 个工作日（跳过周末）
+      let daysAdded = 0;
+      while (daysAdded < 2) {
+        dateObj.setDate(dateObj.getDate() + 1);
+        const day = dateObj.getDay();
+        if (day !== 0 && day !== 6) {
+          daysAdded++;
+        }
+      }
+      // 格式化为 MM.DD+0
+      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const day = String(dateObj.getDate()).padStart(2, '0');
+      const settlementStr = `${month}.${day}+0`;
 
       // 如果匹配到了完整数据（有代码和简称），输出标准化格式
       if (item.issueCode && item.issueName) {
-        // 标准化格式：代码 代码简称 期限 收益率 净价 交割日期
+        // 标准化格式：代码 代码简称 期限 收益率 净价 [量] 交割日期
         // yield 是用户输入的收益率，refYield 是参考收益率（可能为空或期限）
         // price 是净价（数据库中可能为空）
-        return `${item.issueCode} ${item.issueName} ${item.tenor} ${item.yield || item.refYield || '-'} ${item.price || '-'} ${settlementStr}`;
+        const yieldStr = formatYield(item.yield || item.refYield);
+        const volumeStr = item.volume ? ` ${item.volume}` : '';
+        return `${item.issueCode} ${item.issueName} ${item.tenor} ${yieldStr} ${item.price || '-'}${volumeStr} ${settlementStr}`;
       }
 
       // 原始格式
@@ -279,14 +313,17 @@ export const OutputEditor: React.FC<Props> = ({ items, issueDate }) => {
               {/* 内容 */}
               <div className="flex-1 font-mono text-sm">
                 {hasFullData ? (
-                  // 匹配到完整数据的显示 - 输出格式：代码 代码简称 期限 收益率 净价 交割日期
+                  // 匹配到完整数据的显示 - 输出格式：代码 代码简称 期限 收益率 净价 [量] 交割日期
                   <div className="flex flex-wrap gap-3 items-center">
                     <span className="font-bold text-emerald-600">✓</span>
                     <span className="font-bold text-slate-800">{item.issueCode}</span>
                     <span className="text-slate-700">{item.issueName}</span>
                     <span className="text-indigo-600 font-bold">{item.tenor}</span>
-                    <span className="text-emerald-600 font-bold">{item.refYield || item.yield || '-'}</span>
+                    <span className="text-emerald-600 font-bold">{formatYield(item.refYield || item.yield)}</span>
                     <span className="text-slate-500">{item.price || '-'}</span>
+                    {item.volume && (
+                      <span className="text-slate-400 font-bold">{item.volume}</span>
+                    )}
                     <span className="text-xs text-slate-400">交割：{settlementDate}</span>
                   </div>
                 ) : (
@@ -296,8 +333,10 @@ export const OutputEditor: React.FC<Props> = ({ items, issueDate }) => {
                     <span className="text-slate-500">{item.rating || '-'}</span>
                     <span className="text-slate-500">{item.weekday || '-'}</span>
                     <span className="text-indigo-600 font-bold">{item.tenor || '-'}</span>
-                    <span className="text-emerald-600 font-bold">{item.yield || '-'}</span>
-                    <span className="text-slate-400">{item.volume ? `${item.volume} +` : '-'}</span>
+                    <span className="text-emerald-600 font-bold">{formatYield(item.yield)}</span>
+                    {item.volume && (
+                      <span className="text-slate-400 font-bold">{item.volume}</span>
+                    )}
                     <span className="text-xs text-slate-400">交割：{settlementDate}</span>
                   </div>
                 )}

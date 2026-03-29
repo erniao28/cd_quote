@@ -38,8 +38,8 @@ async function startServer() {
     await initDatabase();
     console.log('[数据库] 初始化完成');
 
-    // 启动定时爬取任务
-    startCrawlScheduler();
+    // 启动定时爬取任务（已禁用，改为全手动触发）
+    // startCrawlScheduler();
 
     // 启动服务器
     app.listen(PORT, HOST, () => {
