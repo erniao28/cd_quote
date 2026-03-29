@@ -223,6 +223,11 @@ const App: React.FC = () => {
     }
   };
 
+  // 添加新项回调
+  const handleAddItem = (newItem: ParsedLine) => {
+    setParsedItems(prev => [...prev, newItem]);
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       {/* 顶部导航栏 */}
@@ -493,7 +498,7 @@ const App: React.FC = () => {
           /* 报价解析标签页 */
           <div className="col-span-12 lg:col-span-8 space-y-6">
             <InputParser ref={inputParserRef} onParsed={handleParsed} issueDate={targetDate} />
-            <OutputEditor items={parsedItems} issueDate={targetDate} onRematch={handleRematch} />
+            <OutputEditor items={parsedItems} issueDate={targetDate} onRematch={handleRematch} onAddItem={handleAddItem} />
           </div>
         )}
       </main>

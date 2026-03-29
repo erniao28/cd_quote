@@ -17,7 +17,18 @@
       "Bash(git remote:*)",
       "Bash(grep -o \"applyMatchedResults\" frontend/dist/assets/*.js)",
       "Bash(grep -o \"issueCode.*issueName.*price\" frontend/dist/assets/*.js)",
-      "Bash(cat frontend/dist/assets/index-*.js)"
+      "Bash(cat frontend/dist/assets/index-*.js)",
+      "Bash(bash verify-deploy.sh)",
+      "Bash(bash deploy-and-verify.sh 2>&1)",
+      "Bash(bash quick-deploy.sh deploy)",
+      "Bash(ssh -o StrictHostKeyChecking=no root@121.40.35.46 'curl -s -X POST http://localhost:3002/download-excel -H \"\"\"\"Content-Type: application/json\"\"\"\" -d \"\"\"\"{\\\\\"\"\"\"targetDate\\\\\"\"\"\":\\\\\"\"\"\"2026-03-30\\\\\"\"\"\"}\"\"\"\"')",
+      "Bash(bash quick-deloy.sh deploy)",
+      "Bash(ls:*)",
+      "Bash(pm2 logs:*)",
+      "Bash(pm2 list:*)",
+      "Bash(tail -100 /root/cd-quote/backend/logs/*.log)",
+      "Bash(ssh root@121.40.35.46 \"curl -s -X POST http://127.0.0.1:3002/crawl -H ''''Content-Type: application/json'''' -d ''''{\"\"targetDate\"\":\"\"2026-03-30\"\"}'''' &\")",
+      "Bash(cd:*)"
     ]
   }
 }

@@ -260,24 +260,6 @@ export function parseLine(input: string): ParsedLine {
       if (bank) {
         result.bankName = bank;
         result.matched = true;
-
-        // 检查是否银行名和期限/量连在一起（如"中信 1Y"、"浦发一年"、"浦发一年 5e"、"中信 360"）
-        // 先提取银行名，然后递归解析剩余部分
-        const bankMatch = part.match(/^(.+?)(\d+[YM]|一 |1[年 Y]|2[年 Y]|3[年 Y]|个月 | 个月 | 天|\d+[eE]|亿|\d{2,3})/i);
-        if (bankMatch) {
-          const remainder = part.substring(bankMatch[1].length);
-          // 递归解析剩余部分（期限和量）
-          const remainderResult = parseLine(remainder);
-          if (remainderResult.tenor) {
-            result.tenor = remainderResult.tenor;
-          }
-          if (remainderResult.volume) {
-            result.volume = remainderResult.volume;
-          }
-          if (remainderResult.yield) {
-            result.yield = remainderResult.yield;
-          }
-        }
         continue;
       }
     }
@@ -301,26 +283,23 @@ export function parseLine(input: string): ParsedLine {
       }
     }
 
-    // 尝试匹配量（带 e/亿/亿元的数字）- 优先级高于收益率
-    if (!result.volume && /[0-9]/.test(part)) {
-      // 检查是否是量的格式：数字+e 或 数字 + 亿
-      if (part.toLowerCase().includes("e") || part.includes("亿") || part.includes("亿元")) {
-        const volume = normalizeVolume(part);
-        if (volume) {
-          result.volume = volume;
-          continue;
-        }
-      }
-    }
-
-    // 尝试匹配收益率（数字 +%）- 必须有%符号
-    if (!result.yield && /[\d.]+%/.test(part)) {
-      const yieldMatch = part.match(/([\d.]+)%/);
+    // 尝试匹配收益率（数字 + %）
+    if (!result.yield && /[\d.]+%?/.test(part)) {
+      const yieldMatch = part.match(/([\d.]+)%?/);
       if (yieldMatch) {
         result.yield = `${yieldMatch[1]}%`;
         continue;
       }
     }
+    // 尝试匹配量（数字 + 亿/e/万）
+    if (!result.volume && /[0-9]/.test(part)) {
+      const volume = normalizeVolume(part);
+      if (volume) {
+        result.volume = volume;
+        continue;
+      }
+    }
+
 
     // 尝试匹配 weekday
     if (!result.weekday && /[周一二三四五六日]/.test(part)) {
@@ -331,10 +310,10 @@ export function parseLine(input: string): ParsedLine {
 
   // 检查必填字段
   if (!result.bankName) {
-    result.issues.push("未识别银行名称");
+    result.issues.push('未识别银行名称');
   }
   if (!result.tenor) {
-    result.issues.push("未识别期限");
+    result.issues.push('未识别期限');
   }
 
   return result;

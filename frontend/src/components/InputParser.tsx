@@ -400,7 +400,7 @@ export const InputParser: React.FC<Props> = forwardRef((props, ref) => {
                   matches={result._matches || []}
                   issueDate={issueDate}
                   hasSelected={!!result._selectedMatch}
-                  autoSelect={true}  // 自动选中第一个
+                  autoSelect={false}  // 禁用自动确认，让用户手动选择
                   onConfirm={(matchedData) => handleMatchConfirm(originalIdx, matchedData)}
                 />
               ))}
