@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { ParsedLine, parseBatchInput, matchBankName, normalizeTenor, normalizeVolume } from '../utils/parser';
 import { fetchLatestPrices, fetchTempQuotes } from '../services/api';
 
@@ -20,7 +20,8 @@ interface Props {
   issueDate?: string;
 }
 
-export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
+export const InputParser: React.FC<Props> = forwardRef((props, ref) => {
+  const { onParsed, issueDate } = props;
   const [inputText, setInputText] = useState('');
   const [parsedResults, setParsedResults] = useState<ParsedLine[]>([]);
   const [showPreview, setShowPreview] = useState(false);
@@ -99,13 +100,19 @@ export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
 
   const handleParse = () => {
     const results = parseBatchInput(inputText);
-    setParsedResults(results);
-    setShowPreview(true);
-    setMatchedResults([]);  // 清空之前的匹配结果
-    onParsed(results);
+
+    // 追加模式：将新解析的数据添加到现有数据末尾
+    setParsedResults(prev => {
+      const updated = [...prev, ...results];
+      setShowPreview(true);
+      // 通知父组件（追加而不是覆盖）
+      onParsedRef.current(updated);
+      return updated;
+    });
+    // 不清空匹配结果，保留已匹配的
   };
 
-  // 打开匹配弹窗
+  // 打开匹配弹窗 - 只匹配未匹配的数据
   const handleMatch = () => {
     if (!parsedResults || parsedResults.length === 0) {
       alert('请先解析输入数据');
@@ -113,6 +120,11 @@ export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
     }
 
     const results = parsedResults.map(item => {
+      // 已经匹配过的数据，保持原样
+      if (item.matched && item._selectedMatch) {
+        return item;
+      }
+      // 未匹配的数据，进行匹配
       const matches = matchPriceData(item.bankName, item.tenor);
       console.log('匹配数据:', item.bankName, item.tenor, '=>', matches.length, '条');
       return {
@@ -223,6 +235,11 @@ export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
 
   const successCount = parsedResults.filter(r => r.matched).length;
 
+  // 暴露方法给父组件
+  useImperativeHandle(ref, () => ({
+    handleMatch
+  }));
+
   return (
     <section className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
       <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
@@ -262,7 +279,7 @@ export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
         </button>
       </div>
 
-      {/* 解析结果预览 */}
+      {/* 解析结果预览 - 只显示未匹配的 */}
       {showPreview && parsedResults.length > 0 && (
         <div className="mt-6">
           <div className="flex justify-between items-center mb-3">
@@ -293,53 +310,56 @@ export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
 
           <div className="space-y-2 max-h-[300px] overflow-y-auto">
             {parsedResults.map((item, index) => (
-              <div
-                key={index}
-                className={`p-3 rounded-xl border ${
-                  item.matched ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'
-                }`}
-              >
-                <div className="flex flex-wrap gap-2 items-center">
-                  <input
-                    value={item.bankName || ''}
-                    onChange={(e) => handleUpdateItem(index, 'bankName', e.target.value)}
-                    placeholder="银行"
-                    className="w-24 text-xs bg-white border border-slate-200 rounded px-2 py-1"
-                  />
-                  <input
-                    value={item.tenor || ''}
-                    onChange={(e) => handleUpdateItem(index, 'tenor', e.target.value)}
-                    placeholder="期限"
-                    className="w-16 text-xs bg-white border border-slate-200 rounded px-2 py-1"
-                  />
-                  <input
-                    value={item.yield || ''}
-                    onChange={(e) => handleUpdateItem(index, 'yield', e.target.value)}
-                    placeholder="收益率"
-                    className="w-20 text-xs bg-white border border-slate-200 rounded px-2 py-1"
-                  />
-                  <input
-                    value={item.volume || ''}
-                    onChange={(e) => handleUpdateItem(index, 'volume', normalizeVolume(e.target.value) || e.target.value)}
-                    placeholder="量"
-                    className="w-16 text-xs bg-white border border-slate-200 rounded px-2 py-1"
-                  />
-                  <input
-                    value={item.weekday || ''}
-                    onChange={(e) => handleUpdateItem(index, 'weekday', e.target.value)}
-                    placeholder="周次"
-                    className="w-16 text-xs bg-white border border-slate-200 rounded px-2 py-1"
-                  />
-                  {item.issues.length > 0 && (
-                    <span className="text-xs text-amber-600">
-                      ⚠️ {item.issues.join(', ')}
-                    </span>
-                  )}
+              // 只显示未匹配的解析结果
+              (!item.matched || !item.issueCode) && (
+                <div
+                  key={index}
+                  className={`p-3 rounded-xl border ${
+                    item.matched ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'
+                  }`}
+                >
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <input
+                      value={item.bankName || ''}
+                      onChange={(e) => handleUpdateItem(index, 'bankName', e.target.value)}
+                      placeholder="银行"
+                      className="w-24 text-xs bg-white border border-slate-200 rounded px-2 py-1"
+                    />
+                    <input
+                      value={item.tenor || ''}
+                      onChange={(e) => handleUpdateItem(index, 'tenor', e.target.value)}
+                      placeholder="期限"
+                      className="w-16 text-xs bg-white border border-slate-200 rounded px-2 py-1"
+                    />
+                    <input
+                      value={item.yield || ''}
+                      onChange={(e) => handleUpdateItem(index, 'yield', e.target.value)}
+                      placeholder="收益率"
+                      className="w-20 text-xs bg-white border border-slate-200 rounded px-2 py-1"
+                    />
+                    <input
+                      value={item.volume || ''}
+                      onChange={(e) => handleUpdateItem(index, 'volume', normalizeVolume(e.target.value) || e.target.value)}
+                      placeholder="量"
+                      className="w-16 text-xs bg-white border border-slate-200 rounded px-2 py-1"
+                    />
+                    <input
+                      value={item.weekday || ''}
+                      onChange={(e) => handleUpdateItem(index, 'weekday', e.target.value)}
+                      placeholder="周次"
+                      className="w-16 text-xs bg-white border border-slate-200 rounded px-2 py-1"
+                    />
+                    {item.issues.length > 0 && (
+                      <span className="text-xs text-amber-600">
+                        ⚠️ {item.issues.join(', ')}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-slate-400 mt-1 font-mono">
+                    原始：{item.raw}
+                  </div>
                 </div>
-                <div className="text-xs text-slate-400 mt-1 font-mono">
-                  原始：{item.raw}
-                </div>
-              </div>
+              )
             ))}
           </div>
         </div>
@@ -371,16 +391,17 @@ export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
               </button>
             </div>
 
-            {/* 匹配列表 */}
+            {/* 匹配列表 - 显示所有项，包括已匹配的（允许修改） */}
             <div className="flex-1 overflow-auto p-6">
-              {matchedResults.map((result, idx) => (
+              {matchedResults.map((result, originalIdx) => (
                 <MatchItem
-                  key={idx}
+                  key={originalIdx}
                   parsedItem={result}
                   matches={result._matches || []}
                   issueDate={issueDate}
                   hasSelected={!!result._selectedMatch}
-                  onConfirm={(matchedData) => handleMatchConfirm(idx, matchedData)}
+                  autoSelect={true}  // 自动选中第一个
+                  onConfirm={(matchedData) => handleMatchConfirm(originalIdx, matchedData)}
                 />
               ))}
             </div>
@@ -408,7 +429,7 @@ export const InputParser: React.FC<Props> = ({ onParsed, issueDate }) => {
       )}
     </section>
   );
-};
+});
 
 // 匹配项组件
 const MatchItem: React.FC<{
@@ -416,11 +437,19 @@ const MatchItem: React.FC<{
   matches: PriceData[];
   issueDate?: string;
   hasSelected?: boolean;
+  autoSelect?: boolean;  // 自动选中第一个并确认
   onConfirm: (data: PriceData) => void;
-}> = ({ parsedItem, matches, issueDate, hasSelected, onConfirm }) => {
+}> = ({ parsedItem, matches, issueDate, hasSelected, autoSelect, onConfirm }) => {
   const [selectedMatch, setSelectedMatch] = useState<PriceData | null>(
     matches[0] || null
   );
+
+  // 自动确认第一个匹配项
+  useEffect(() => {
+    if (autoSelect && matches.length > 0 && !hasSelected) {
+      onConfirm(matches[0]);
+    }
+  }, [autoSelect, hasSelected, matches, onConfirm]);
 
   return (
     <div className={`mb-6 p-4 rounded-xl border ${hasSelected ? 'bg-emerald-50 border-emerald-300' : 'bg-slate-50 border-slate-200'}`}>

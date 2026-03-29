@@ -31,6 +31,7 @@ const App: React.FC = () => {
   // 输入解析相关
   const [parsedItems, setParsedItems] = useState<ParsedLine[]>([]);
   const [activeTab, setActiveTab] = useState<'crawler' | 'parser'>('crawler');
+  const inputParserRef = React.useRef<any>(null);  // 用于调用 InputParser 的方法
 
   // 在线编辑相关
   const [showTempEditor, setShowTempEditor] = useState(false);
@@ -212,6 +213,14 @@ const App: React.FC = () => {
 
   const handleParsed = (results: ParsedLine[]) => {
     setParsedItems(results);
+  };
+
+  // 重新匹配回调
+  const handleRematch = () => {
+    // 触发 InputParser 中的匹配功能
+    if (inputParserRef.current) {
+      inputParserRef.current.handleMatch();
+    }
   };
 
   return (
@@ -483,8 +492,8 @@ const App: React.FC = () => {
         ) : (
           /* 报价解析标签页 */
           <div className="col-span-12 lg:col-span-8 space-y-6">
-            <InputParser onParsed={handleParsed} issueDate={targetDate} />
-            <OutputEditor items={parsedItems} issueDate={targetDate} />
+            <InputParser ref={inputParserRef} onParsed={handleParsed} issueDate={targetDate} />
+            <OutputEditor items={parsedItems} issueDate={targetDate} onRematch={handleRematch} />
           </div>
         )}
       </main>

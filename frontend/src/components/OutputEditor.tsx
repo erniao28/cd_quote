@@ -4,6 +4,7 @@ import { ParsedLine } from '../utils/parser';
 interface Props {
   items: ParsedLine[];
   issueDate: string;
+  onRematch?: () => void;  // 重新匹配回调
 }
 
 export const OutputEditor: React.FC<Props> = ({ items, issueDate }) => {
@@ -99,9 +100,12 @@ export const OutputEditor: React.FC<Props> = ({ items, issueDate }) => {
     }
   };
 
-  const handleCopy = () => {
-    const output = order.map((idx) => {
-      const item = items[idx];
+  const handleCopy = (withNumber = false) => {
+    // 只复制选中的项，如果没有选中则复制全部
+    const indicesToCopy = selected.length > 0 ? selected : order;
+
+    const output = indicesToCopy.map((originalIndex, i) => {
+      const item = items[originalIndex];
       // 使用 issueDate 计算交割日期（发行日期 + T+2 工作日）
       const issueDateStr = item.issueDate || issueDate;
       const dateObj = new Date(issueDateStr);
@@ -122,11 +126,10 @@ export const OutputEditor: React.FC<Props> = ({ items, issueDate }) => {
       // 如果匹配到了完整数据（有代码和简称），输出标准化格式
       if (item.issueCode && item.issueName) {
         // 标准化格式：代码 代码简称 期限 收益率 净价 [量] 交割日期
-        // yield 是用户输入的收益率，refYield 是参考收益率（可能为空或期限）
-        // price 是净价（数据库中可能为空）
         const yieldStr = formatYield(item.yield || item.refYield);
         const volumeStr = item.volume ? ` ${item.volume}` : '';
-        return `${item.issueCode} ${item.issueName} ${item.tenor} ${yieldStr} ${item.price || '-'}${volumeStr} ${settlementStr}`;
+        const numberPrefix = withNumber ? `${i + 1}. ` : '';
+        return `${numberPrefix}${item.issueCode} ${item.issueName} ${item.tenor} ${yieldStr} ${item.price || '-'}${volumeStr} ${settlementStr}`;
       }
 
       // 原始格式
@@ -138,7 +141,8 @@ export const OutputEditor: React.FC<Props> = ({ items, issueDate }) => {
         item.yield || '',
         item.volume ? `${item.volume} +` : ''
       ].filter(Boolean).join(' ');
-      return parts;
+      const numberPrefix = withNumber ? `${i + 1}. ` : '';
+      return `${numberPrefix}${parts}`;
     }).join('\n');
 
     // 降级方案：navigator.clipboard 在非 HTTPS 环境可能不可用
@@ -157,6 +161,21 @@ export const OutputEditor: React.FC<Props> = ({ items, issueDate }) => {
     }
     setCopyFeedback(true);
     setTimeout(() => setCopyFeedback(false), 2000);
+  };
+
+  const handleDeleteSelected = () => {
+    if (selected.length === 0) return;
+
+    if (!window.confirm(`确定要删除选中的 ${selected.length} 条数据吗？`)) return;
+
+    // 删除选中的数据
+    const newOrder = order.filter((_, idx) => !selected.includes(idx));
+    setOrder(newOrder);
+    setSelected([]);
+
+    // 同时更新父组件的 items
+    const newItems = items.filter((_, idx) => !selected.includes(idx));
+    itemsRef.current = newItems;
   };
 
   const handleRenumber = () => {
@@ -179,6 +198,21 @@ export const OutputEditor: React.FC<Props> = ({ items, issueDate }) => {
           <span className="w-2 h-2 rounded-full bg-indigo-500"></span> 输出编辑
         </h2>
         <div className="flex gap-2">
+          {onRematch && (
+            <button
+              onClick={onRematch}
+              className="px-3 py-1.5 text-xs bg-indigo-100 text-indigo-600 rounded-lg font-bold hover:bg-indigo-200"
+            >
+              重新匹配
+            </button>
+          )}
+          <button
+            onClick={handleDeleteSelected}
+            disabled={selected.length === 0}
+            className="px-3 py-1.5 text-xs bg-red-100 text-red-600 rounded-lg font-bold disabled:opacity-50"
+          >
+            删除选中 ({selected.length})
+          </button>
           <button
             onClick={handleRenumber}
             disabled={selected.length === 0}
@@ -187,12 +221,20 @@ export const OutputEditor: React.FC<Props> = ({ items, issueDate }) => {
             重新编号 ({selected.length})
           </button>
           <button
-            onClick={handleCopy}
+            onClick={() => handleCopy(false)}
+            className={`px-4 py-1.5 text-xs rounded-lg font-bold transition-all ${
+              copyFeedback ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+            }`}
+          >
+            {copyFeedback ? '✓ 已复制' : '复制选中'}
+          </button>
+          <button
+            onClick={() => handleCopy(true)}
             className={`px-4 py-1.5 text-xs rounded-lg font-bold transition-all ${
               copyFeedback ? 'bg-emerald-500 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-700'
             }`}
           >
-            {copyFeedback ? '✓ 已复制' : '复制'}
+            {copyFeedback ? '✓ 已复制' : '带编号复制'}
           </button>
         </div>
       </div>
