@@ -228,15 +228,31 @@ const App: React.FC = () => {
     setParsedItems(prev => [...prev, newItem]);
   };
 
+  // 跳转到一级报价系统
+  const handleGoToQuotation = () => {
+    const baseUrl = window.location.origin;
+    window.open(baseUrl, '_blank');
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       {/* 顶部导航栏 */}
       <header className="bg-white border-b border-slate-200 px-8 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
         <div className="flex items-center gap-3">
           <div className="bg-indigo-600 text-white p-2 rounded-xl font-bold text-xl">CD.Quote</div>
-          <h1 className="text-lg font-bold text-slate-800">货币网爬虫系统</h1>
+          <h1 className="text-lg font-bold text-slate-800">要素生成</h1>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <button
+            onClick={handleGoToQuotation}
+            className="px-4 py-2 bg-emerald-500 text-white rounded-xl text-sm font-bold hover:bg-emerald-600 transition-all flex items-center gap-2"
+            title="打开一级报价系统"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+            一级报价
+          </button>
           <button
             onClick={() => setActiveTab('crawler')}
             className={`px-4 py-2 rounded-xl text-sm font-bold ${

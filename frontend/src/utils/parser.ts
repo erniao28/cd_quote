@@ -263,7 +263,8 @@ export function parseLine(input: string): ParsedLine {
 
         // 检查是否银行名和期限/量连在一起（如"中信 1Y"、"浦发一年"、"浦发一年 5e"、"中信 360"）
         // 先提取银行名，然后递归解析剩余部分
-        const bankMatch = part.match(/^(.+?)(\d+[YM]|一 |1[年 Y]|2[年 Y]|3[年 Y]|个月 | 个月 | 天|\d+[eE]|亿|\d{2,3})/i);
+        // 期限匹配模式：1Y/2Y/3Y、1M/2M/3M、一年/两年、360 天、270 天、180 天、90 天、30 天、或纯数字 (30/60/90/180/270/360)
+        const bankMatch = part.match(/^(.+?)(\d+[YM]|一 |1[年 Y]|2[年 Y]|3[年 Y]|个月 | 个月 | 天|\d+[eE]|亿|(?:360|270|180|90|60|30)(?:天 |D)?)$/i);
         if (bankMatch) {
           const remainder = part.substring(bankMatch[1].length);
           // 递归解析剩余部分（期限和量）
